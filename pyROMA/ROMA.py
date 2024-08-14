@@ -1,8 +1,3 @@
-#import pandas as pd
-#import os
-#import sys
-#import anndata
-#import pickle
 import numpy as np
 import time
 from scipy import stats
@@ -21,8 +16,6 @@ class color:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
     END = '\033[0m'
-
-#print(color.BOLD + 'Hello, World!' + color.END)
 
 class ROMA:
     def __init__(self):
@@ -136,7 +129,6 @@ class ROMA:
 
         
         # Omitting the centering of the subset to obtain global centering: 
-        # Centering the matrix
         #X = subset.X - subset.X.mean(axis=0)
         X = np.asarray(subset.X.T) 
         # Compute the SVD of X without the outliers
