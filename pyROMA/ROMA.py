@@ -112,10 +112,17 @@ class ROMA:
     def robustTruncatedSVD(self, adata, subsetlist, outliers, for_randomset=False, algorithm='randomized'):
         from sklearn.decomposition import TruncatedSVD
 
-        subset = [x for i, x in enumerate(subsetlist) if i not in outliers]
+        # TODO: here we can calculate the average proportion of the outliers 
+        # updating the avg score by each iteration...
+        if for_randomset:
+            subset = [x for i, x in enumerate(subsetlist)]
+            # here calculate the proportion (outliers variable per iteration comes from loocv)
+            #self.outliers_avg_proportion += len(outliers)/len(subsetlist)
+            #self.outliers_avg_proportion /= 2 
+        else:    
+            subset = [x for i, x in enumerate(subsetlist) if i not in outliers]
         subset = adata[:, [x for x in subset]]
 
-        
         # Omitting the centering of the subset to obtain global centering: 
         #X = subset.X - subset.X.mean(axis=0)
         X = np.asarray(subset.X.T) 
@@ -123,12 +130,10 @@ class ROMA:
         svd = TruncatedSVD(n_components=2, algorithm=algorithm, n_oversamples=2) #algorithm='arpack')
         svd.fit(X)
         #svd.explained_variance_ratio_ = (s ** 2) / (X.shape[0] - 1)
-        if for_randomset:
-            return svd, X
-        else:
+        if not for_randomset:
             self.svd = svd
             self.X = X
-            return svd, X
+        return svd, X
 
     def robustIncrementalPCA(self, adata, subsetlist, outliers, for_randomset=False, partial_fit=False):
         
@@ -153,14 +158,12 @@ class ROMA:
             svd.partial_fit(X)
         else:            
             svd.fit(X)
-
-        # Return the model and data if for_randomset, else store in the object
-        if for_randomset:
-            return svd, X
-        else:
+        
+        # Store in the object if not for_randomset
+        if not for_randomset:
             self.svd = svd
             self.X = X
-            return svd, X
+        return svd, X
 
 
     def orient_pc1(self, pc1, data):
@@ -178,15 +181,16 @@ class ROMA:
         Computes the shifted pathway 
         """
 
-        pc1 = svd_.components_[0]
+        pc1, pc2 = svd_.components_
         # Orient PC1
         pc1 = self.orient_pc1(pc1, X)
-        projections = X @ pc1 # the scores that each gene have in the sample space
+        projections_1 = X @ pc1 # the scores that each gene have in the sample space
+        projections_2 = X @ pc2
         #print('shape of projections should corresponds to n_genes', projections.shape)
         # Compute the median of the projections
-        median_exp = np.median(projections) 
-
-        return median_exp
+        median_exp = np.median(projections_1) 
+        # TODO: is median expression is calculated only with the pc1 projections?
+        return median_exp, projections_1, projections_2
 
 
     def process_iteration(self, sequence, idx, iteration, incremental, partial_fit, algorithm):
@@ -204,9 +208,9 @@ class ROMA:
             svd_, X = self.robustTruncatedSVD(self.adata, gene_subset, outliers, for_randomset=True, algorithm=algorithm)
             
         l1 = svd_.explained_variance_ratio_
-        median_exp = self.compute_median_exp(svd_, X)
+        median_exp, null_projections_1, null_projections_2 = self.compute_median_exp(svd_, X)
 
-        return l1, median_exp
+        return l1, median_exp, null_projections_1, null_projections_2
         
     def randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
         """
@@ -223,20 +227,11 @@ class ROMA:
         
         candidate_nullgeneset_size = self.nullgenesetsize
         #len(self.subsetlist)
-        #candidate_nullgeneset_size = sum(1 for i in range(len(subsetlist)) if i not in outliers)
-        #print('candidate size', candidate_nullgeneset_size)
-
-        #log_null_sizes = np.log(self.null_geneset_sizes)
-        #closest_index = np.argmin(np.abs(log_null_sizes - candidate_nullgeneset_size))
-
-        #closest_nullgeneset_size = self.null_geneset_sizes[candidate_nullgeneset_size]
-        #self.nullgenesetsize = closest_nullgeneset_size
-        #print('nullgenesetsize', self.nullgenesetsize)
 
         # If the null distribution with this null geneset size was caclulated, pass to the next pathway
         if candidate_nullgeneset_size in self.null_distributions:
             self.nulll1, self.null_median_exp = self.null_distributions[candidate_nullgeneset_size]
-            print('took null distribution from previous calculation')
+            print('Took null distribution from previous calculation')
         else: 
             # Define the number of iterationsself.null_geneset_sizes
             num_iterations = iters
@@ -249,14 +244,18 @@ class ROMA:
             )
 
             # Unzip the results
-            nulll1, null_median_exp = list(zip(*results))
+            nulll1, null_median_exp, null_projections_1, null_projections_2 = list(zip(*results))
             nulll1_array = np.array(nulll1)
             null_median_exp = np.array(null_median_exp)
+            null_projections_1 = np.array(null_projections_1)
+            null_projections_2 = np.array(null_projections_2)
+            null_projections = np.stack((null_projections_1, null_projections_2), axis=1)
             # update the dictiorary with null distributions 
             self.null_distributions[candidate_nullgeneset_size] = [np.copy(nulll1_array), np.copy(null_median_exp)]
             # Store results in the object
             self.nulll1 = np.copy(nulll1_array)
-            self.null_median_exp =  np.copy(null_median_exp)
+            self.null_median_exp = np.copy(null_median_exp)
+            self.null_projections = np.copy(null_projections)
 
             # Calculate elapsed time
             end = time.time()
@@ -293,13 +292,15 @@ class ROMA:
             gene_set_result.test_l1 = test_l1
 
             # Median Exp statistic
-            test_median_exp = self.compute_median_exp(gene_set_result.svd, gene_set_result.X)
+            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X)
             q_value = (np.sum(null_median_distribution >= test_median_exp) + 1) / (len(null_median_distribution) + 1)
             qs[i] = q_value
             gene_set_result.test_median_exp = test_median_exp
+            gene_set_result.projections_1 = projections_1
+            gene_set_result.projections_2 = projections_2
 
-        print('raw p-values', ps)
-        print('raw q-values', qs)
+        #print('raw p-values', ps)
+        #print('raw q-values', qs)
         adjusted_ps = benj_hoch(ps)
         adjusted_qs = benj_hoch(qs)
         # confirm the same lengths of lists
@@ -336,15 +337,18 @@ class ROMA:
         return
     
     class GeneSetResult:
-        def __init__(self, subset, subsetlist, outliers, nullgenesetsize, svd, X, nulll1, null_median_exp):
+        def __init__(self, subset, subsetlist, outliers, nullgenesetsize, svd, X, nulll1, null_median_exp, null_projections):
             self.subset = subset
             self.subsetlist = subsetlist
             self.outliers = outliers
             self.nullgenesetsize = nullgenesetsize
             self.svd = svd
             self.X = X
+            self.projections_1 = None
+            self.projections_2 = None
             self.nulll1 = nulll1
             self.null_median_exp = null_median_exp
+            self.null_projections = null_projections
             self.p_value = None
             self.q_value = None
             self.test_l1 = None
@@ -431,8 +435,6 @@ class ROMA:
                 unprocessed_genesets.append(gene_set_name)
                 continue
             self.loocv(self.subset)
-
-            # Here, let's implement the null gene set sizes and check if it's there already  ;;;
             
             self.approx_size(flag)
             flag = False
@@ -447,19 +449,14 @@ class ROMA:
                 self.randomset_parallel(self.adata, self.subsetlist, 
                                         self.outliers, prefer_type='processes', incremental=incremental, iters=iters, partial_fit=partial_fit, 
                                         algorithm=algorithm)
-            # TODO: here we calculate the shift of the pathay and do the same for the randomset n times
-            # this way we obtain q-value for the activity (or shiftedness)
-            
-            #else:
-            #    self.randomset(self.adata, self.subsetlist, self.outliers, verbose=0, incremental=incremental, iters=iters)
-           
+
             #print('self.nullgenesetsize', self.nullgenesetsize)
             #print('self.nulll1 :', self.nulll1)
             # Store the results for this gene set in a new instance of GeneSetResult
             
             gene_set_result = self.GeneSetResult(self.subset, self.subsetlist, self.outliers, self.nullgenesetsize, 
                                                  self.svd, self.X, 
-                                                 self.nulll1, self.null_median_exp)
+                                                 self.nulll1, self.null_median_exp, self.null_projections)
 
             gene_set_result.custom_name = f"GeneSetResult {gene_set_name}"
             # Store the instance of GeneSetResult in the dictionary using gene set name as the key
@@ -523,3 +520,87 @@ class ROMA:
 
         return 
 
+    # TODO : plotting in progress
+    class pl:
+        def __init__(self):
+            self.geneset_name = None
+        
+        def gene_weights(self, geneset_name):
+            """
+            Plotting the gene weights.
+            """
+            import matplotlib.pyplot as plt
+            import pandas as pd 
+
+            fig, ax1 = plt.subplots(1, 1, figsize=(7.5,16))
+            fig.tight_layout()
+            #sns.set(style="darkgrid")
+            #sns.set_palette("Pastel1")
+            plt.grid(color='white', lw = 0.5, axis='x')
+
+            roma_result = roma.adata.uns['ROMA'][geneset_name]
+            df = pd.DataFrame(roma_result.projections_1, index=roma_result.subsetlist, columns=['gene weights'])
+            df = df.sort_values(by='gene weights', ascending=True).reset_index()
+
+            sns.scatterplot(df, y='index', x='gene weights', color='k', label='gene weights', ax=ax1)
+            ax1.set_title(f'{geneset_name} Gene Weights', loc = 'center', fontsize = 18)
+            plt.setp(ax1, xlabel='PC1 scores')
+            plt.setp(ax1, ylabel='Gene')
+            plt.yticks(fontsize=8, linespacing=0.9)
+            plt.grid(color='white', lw = 1, axis='both')
+
+            #plt.title(f'Gene Weights', loc = 'right', fontsize = 18)
+            plt.legend()
+            plt.show()
+            
+            return
+        
+        def plot_gene_projections(self, geneset_name):
+            """
+            Represent the pathway genes in the pca space.
+            Against null distribution , i.e. genes in the pca space of all the random genesets.
+            """
+            
+            import numpy as np
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+
+            sns.set(style="darkgrid")
+            sns.set_palette("Pastel1")
+
+            # Assuming roma_result is already loaded and contains the required matrices
+            roma_result = roma.adata.uns['ROMA'][geneset_name]
+            projections_1 = roma_result.projections_1
+            projections_2 = roma_result.projections_2
+            null_projections = roma_result.null_projections
+            null_projections_flat = null_projections.reshape(-1, 2)
+
+            # Setting up the plot
+            plt.figure(figsize=(10, 8))
+
+            # Setting the axis labels
+            plt.axhline(0,color='k') # x = 0
+            plt.axvline(0,color='k') # y = 0
+            plt.xlabel('PC1')
+            plt.ylabel('PC2')
+
+            # Plotting the points from all matrices in null_projections in hollowish Tr. Blue color
+            sns.scatterplot(x=null_projections_flat[:, 0], y=null_projections_flat[:, 1], color='dodgerblue', label='Null Projections', edgecolor='black', marker='o', alpha=0.2)
+
+            # Plotting the points from projections_2 in Red color (Tr. Red)
+            sns.scatterplot(x=projections_1, y=projections_2, color='red', label=f'{geneset_name}', edgecolor='black')
+
+            # Adding grid
+            plt.grid(True)
+
+            # Adding title
+            plt.title(f'{geneset_name} and Null distribution in PCA space ')
+
+            # Removing the legend duplicates
+            handles, labels = plt.gca().get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            plt.legend(by_label.values(), by_label.keys())
+
+            # Showing the plot
+            plt.show()
+            return
