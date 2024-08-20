@@ -11,4 +11,6 @@
 
 `46_rROMA_dataset_il17_TNF_from_R_hallmarks.ipynb` - Scenario #2: comparison of healthy control samples before and after treatment with IL17+TNFalpha 
 
+`47_test_the_plotting.ipynb` - explores the plotting functions
+
 Datasets are downloaded from https://github.com/sysbio-curie/rRoma_comp and exported as .tsv files to `datasets` folder
