@@ -11,13 +11,14 @@ class ROMA:
     
     # TODO in plotting : handle many genesets, heatmap (?) 
     from .plotting import plotting as pl 
+    #TODO: initialize pl.adata with roma.adata
     pl = pl()
     
     def __init__(self):
         self.adata = None
         self.gmt = None
         self.genesets = {}
-        self.approx_int = 20
+        self.approx_int = 20 # Granularity of the null geneset size, from 0 to 100, less is more precise
         self.min_n_genes = 10
         self.nullgenesetsize = None
         self.subset = None
@@ -44,9 +45,11 @@ class ROMA:
     warnings.filterwarnings("ignore") #worked to supperss the warning message about copying the dataframe
 
     def read_gmt_to_dict(self, gmt):
+        # gmt = an absolute path to .gmt file 
         genesets = {}
         
-        file_name = f'genesets/{gmt}.gmt'
+        file_name = f'{gmt}'
+        
         with open(file_name, 'r') as file:
             lines = [line.rstrip('\n') for line in file]
 
@@ -75,11 +78,13 @@ class ROMA:
     
         
     def loocv(self, subset, verbose=0, for_randomset=False):
+        # TODO: incremental PCA if it's used in the main coompute function
+        
         from sklearn.decomposition import TruncatedSVD
         from sklearn.model_selection import LeaveOneOut
 
         # Since the ROMA computes PCA in sample space the matrix needs to be transposed
-        X = subset.X.T
+        #X = subset.X.T
         #X = X - X.mean(axis=0)
         X = np.asarray(X)
 
@@ -131,7 +136,7 @@ class ROMA:
         subset = adata[:, [x for x in subset]]
 
         # Omitting the centering of the subset to obtain global centering: 
-        #X = subset.X - subset.X.mean(axis=0)
+        X = subset.X - subset.X.mean(axis=0)
         X = np.asarray(subset.X.T) 
         # Compute the SVD of X without the outliers
         svd = TruncatedSVD(n_components=2, algorithm=algorithm, n_oversamples=2) #algorithm='arpack')
@@ -157,10 +162,10 @@ class ROMA:
         #X = subset.X - subset.X.mean(axis=0)
         # Since the ROMA computes PCA in sample space the matrix needs to be transposed
         X = subset.X.T
-        X = np.asarray(X) 
+        X = np.asarray(X.T) # normally it shouldn't be transpose - double checking for rROMA
 
         # Initialize IncrementalPCA for 1 component
-        svd = IncrementalPCA(n_components=1, batch_size=1000)
+        svd = IncrementalPCA(n_components=2, batch_size=1000)
         if partial_fit:
             svd.partial_fit(X)
         else:            
@@ -276,6 +281,9 @@ class ROMA:
         return
 
     def assess_significance(self, results):
+        
+        # TODO: outputx the non-adjusted p-s and Median exp non-adj p-s well
+        
         """
         Computes the empirical p-value based on the null distribution of L1 scores and median expression.
         Adjust p-values and q-values using the Benjamini-Hochberg procedure.
@@ -315,7 +323,9 @@ class ROMA:
         
         for i, (_, gene_set_result) in enumerate(results.items()):
             gene_set_result.p_value = adjusted_ps[i]
+            gene_set_result.non_adj_p = ps[i]
             gene_set_result.q_value = adjusted_qs[i]
+            gene_set_result.non_adj_q = qs[i]
         return results
 
     def approx_size(self, flag):
@@ -358,6 +368,8 @@ class ROMA:
             self.null_projections = null_projections
             self.p_value = None
             self.q_value = None
+            self.non_adj_p = None
+            self.non_adj_q = None
             self.test_l1 = None
             self.test_median_exp = None
         
@@ -403,8 +415,9 @@ class ROMA:
 
         return df
     
-    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized'):        
+    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True):        
         
+        #pl.adata = self.adata
         """
         Computes ROMA
         min_n_genes = 10 (default) minimum geneset size of genes present in the provided dataset.
@@ -441,7 +454,8 @@ class ROMA:
             if len(self.subsetlist) < self.min_n_genes:
                 unprocessed_genesets.append(gene_set_name)
                 continue
-            self.loocv(self.subset)
+            if loocv_on:
+                self.loocv(self.subset)
             
             self.approx_size(flag)
             flag = False
