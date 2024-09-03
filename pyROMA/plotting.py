@@ -8,6 +8,7 @@ class plotting:
         Plotting the gene weights.
         """
         # TODO: make it adaptable to the size of the geneset - so all the genes fit
+        # TODO: initialize with  roma.adata 
         import matplotlib.pyplot as plt
         import pandas as pd 
         import seaborn as sns
