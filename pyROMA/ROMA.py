@@ -84,7 +84,7 @@ class ROMA:
         from sklearn.model_selection import LeaveOneOut
 
         # Since the ROMA computes PCA in sample space the matrix needs to be transposed
-        #X = subset.X.T
+        X = subset.X.T
         #X = X - X.mean(axis=0)
         X = np.asarray(X)
 
@@ -136,12 +136,38 @@ class ROMA:
         subset = adata[:, [x for x in subset]]
 
         # Omitting the centering of the subset to obtain global centering: 
-        X = subset.X - subset.X.mean(axis=0)
+        #X = subset.X - subset.X.mean(axis=0)
         X = np.asarray(subset.X.T) 
         # Compute the SVD of X without the outliers
         svd = TruncatedSVD(n_components=2, algorithm=algorithm, n_oversamples=2) #algorithm='arpack')
         svd.fit(X)
         #svd.explained_variance_ratio_ = (s ** 2) / (X.shape[0] - 1)
+        if not for_randomset:
+            self.svd = svd
+            self.X = X
+        return svd, X
+
+    def robustPCA(self, adata, subsetlist, outliers, for_randomset=False, algorithm='auto'):
+        from sklearn.decomposition import PCA
+
+        # TODO: here we can calculate the average proportion of the outliers 
+        # updating the avg score by each iteration...
+        if for_randomset:
+            subset = [x for i, x in enumerate(subsetlist)]
+            # here calculate the proportion (outliers variable per iteration comes from loocv)
+            #self.outliers_avg_proportion += len(outliers)/len(subsetlist)
+            #self.outliers_avg_proportion /= 2 
+        else:    
+            subset = [x for i, x in enumerate(subsetlist) if i not in outliers]
+        subset = adata[:, [x for x in subset]]
+
+        # Omitting the centering of the subset to obtain global centering: 
+        #X = subset.X - subset.X.mean(axis=0)
+        X = np.asarray(subset.X.T) 
+        # Compute the SVD of X without the outliers
+        svd = PCA(n_components=2, svd_solver=algorithm) #algorithm='arpack')
+        svd.fit(X)
+
         if not for_randomset:
             self.svd = svd
             self.X = X
@@ -429,9 +455,13 @@ class ROMA:
         results = {}
         
         # Centering expression of each gene in the global matrix, copying the original in adata.raw
-        # Centering over genes 
+        # Centering over samples (genes will have 0 mean)
+        # in rROMA columns are samples, 
+        # and the "scale" function centering is done by subtracting the column means of x from their corresponding columns
         self.adata.raw = self.adata.copy()
-        self.adata.X -= self.adata.X.mean(axis=0)
+        X = self.adata.X.T 
+        X_centered = X - X.mean(axis=0)
+        self.adata.X = X_centered.T 
 
         self.read_gmt_to_dict(self.gmt)
 
@@ -461,7 +491,8 @@ class ROMA:
             flag = False
 
             if incremental:
-                self.robustIncrementalPCA(self.adata, self.subsetlist, self.outliers)
+                self.robustPCA(self.adata, self.subsetlist, self.outliers)
+                #self.robustIncrementalPCA(self.adata, self.subsetlist, self.outliers)
                 #self.robustKernelPCA(self.adata, self.subsetlist, self.outliers)
             else:
                 self.robustTruncatedSVD(self.adata, self.subsetlist, self.outliers, algorithm=algorithm)
