@@ -76,7 +76,19 @@ class ROMA:
         self.subsetlist = subsetlist
         return subset, subsetlist
     
+    def double_mean_center_matrix(self, matrix):
+        # Calculate the overall mean of the matrix
+        overall_mean = np.mean(matrix)
         
+        # Calculate row means and column means
+        row_means = np.mean(matrix, axis=1, keepdims=True)
+        col_means = np.mean(matrix, axis=0, keepdims=True)
+        
+        # Center the matrix
+        centered_matrix = matrix - row_means - col_means + overall_mean
+        
+        return centered_matrix
+
     def loocv(self, subset, verbose=0, for_randomset=False):
         # TODO: incremental PCA if it's used in the main coompute function
         
@@ -441,7 +453,7 @@ class ROMA:
 
         return df
     
-    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True):        
+    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=True):        
         
         #pl.adata = self.adata
         """
@@ -460,7 +472,14 @@ class ROMA:
         # and the "scale" function centering is done by subtracting the column means of x from their corresponding columns
         self.adata.raw = self.adata.copy()
         X = self.adata.X.T 
-        X_centered = X - X.mean(axis=0)
+        
+        if double_mean_centering:
+            # centering across samples and genes
+            X_centered = self.double_mean_center_matrix(X)
+        else:
+            # centering over samples, genes have 0 mean
+            X_centered = X - X.mean(axis=0)
+        
         self.adata.X = X_centered.T 
 
         self.read_gmt_to_dict(self.gmt)
