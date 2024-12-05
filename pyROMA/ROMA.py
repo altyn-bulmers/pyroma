@@ -607,9 +607,10 @@ class ROMA:
 
             return
 
-    def assess_significance(self, results):
+    def wilcoxon_assess_significance(self, results):
         
         ### rROMA like
+        ### the correlation of p-values from R and py versions is low
         """
         Computes empirical p-values and performs multiple testing correction.
         
@@ -672,9 +673,9 @@ class ROMA:
 
         return results
 
-    def working_assess_significance(self, results):
+    def assess_significance(self, results):
        # TODO: output the median of null_L1 distribution
-       # TODO: incorporate p-value computation via wilcoxon 
+       # TODO: incorporate an option to compute p-values via wilcoxon 
         """
         Computes the empirical p-value based on the null distribution of L1 scores and median expression.
         Adjust p-values and q-values using the Benjamini-Hochberg procedure.
