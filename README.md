@@ -4,6 +4,10 @@
 
 `conda env create -f environment.yml`
 
+### Install using pip
+
+`pip install roma-analysis`
+
 
 ### Jupyter Notebooks
 
@@ -14,3 +18,8 @@
 `47_test_the_plotting.ipynb` - explores the plotting functions
 
 Datasets are downloaded from https://github.com/sysbio-curie/rRoma_comp and exported as .tsv files to `datasets` folder
+
+
+### rade_data branch
+Contains the comparison of rROMA to pyROMA in stats and plots
+rade_data - is a pseudo bulk normalized data from Sofia Orozco

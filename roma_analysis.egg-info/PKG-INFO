@@ -1,0 +1,18 @@
+Metadata-Version: 2.1
+Name: roma-analysis
+Version: 0.1
+Summary: Representation and Quantification of Module Activity for bulk and single cell transcriptomics in python
+Home-page: https://github.com/altyn-bulmers
+Download-URL: https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.1.zip
+Author: Altynbek Zhubanchaliyev
+Author-email: altynbek.zhubanchaliyev@curie.fr
+License: GPL-3.0
+Keywords: python,bioinformatics,machine-learning,pathway-activity,transcriptomics,rnaseq,single-cell-rna-seq
+Classifier: Development Status :: 3 - Alpha
+Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+Classifier: Programming Language :: Python :: 3
+Requires-Dist: scanpy
+Requires-Dist: scikit-learn
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: pandas
