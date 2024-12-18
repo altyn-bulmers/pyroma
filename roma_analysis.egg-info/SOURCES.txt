@@ -3,7 +3,6 @@ setup.cfg
 setup.py
 pyroma/ROMA.py
 pyroma/__init__.py
-pyroma/oldROMA.py
 pyroma/plotting.py
 pyroma/test.py
 pyroma/utils.py
