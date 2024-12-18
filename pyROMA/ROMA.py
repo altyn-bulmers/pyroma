@@ -227,113 +227,423 @@ class ROMA:
         return svd, X
 
 
-    def fix_pc_sign(self, gene_score, sample_score, wei=None, mode='none', def_wei=1,
-                    thr=None, grouping=None, exp_mat=None, cor_method='pearson'):
-        """
-        Correct the sign of the principal component.
-        
-        Parameters:
-            gene_score (np.ndarray): Array of gene scores (PC loadings).
-            sample_score (np.ndarray): Array of sample scores (PC scores).
-            wei (np.ndarray): Optional array of gene weights.
-            mode (str): Mode to correct the sign.
-            def_wei (float): Default weight for missing weights.
-            thr (float): Quantile threshold.
-            grouping (np.ndarray): Array of group labels for samples.
-            exp_mat (np.ndarray): Expression matrix (genes x samples).
-            cor_method (str): Correlation method ('pearson', 'kendall', 'spearman').
-            
-        Returns:
-            int: +1 or -1 to adjust the PC sign.
-        """
-        import numpy as np
-        from scipy.stats import pearsonr, spearmanr, kendalltau
+    
 
-        if mode == 'none':
-            print("Orienting PC using a random direction")
+    def fix_pc_sign(self, GeneScore, SampleScore, Wei=None, Mode='none', DefWei=1,
+                    Thr=None, Grouping=None, ExpMat=None, CorMethod="pearson"):
+        """
+        Python equivalent of the R FixPCSign function.
+
+        Parameters:
+            GeneScore (np.ndarray): Array of gene scores (PC loadings).
+            SampleScore (np.ndarray): Array of sample scores (PC projections).
+            Wei (np.ndarray or None): Gene weights array aligned with GeneScore.
+            Mode (str): Mode to correct the sign (e.g., 'none', 'PreferActivation', ...).
+            DefWei (float): Default weight for missing weights.
+            Thr (float or None): Quantile threshold or p-value threshold depending on context.
+            Grouping (dict, pd.Series, or None): Maps sample names to groups.
+            ExpMat (pd.DataFrame or None): Expression matrix (genes x samples).
+            CorMethod (str): One of "pearson", "spearman", "kendall".
+
+        Returns:
+            int: +1 or -1 indicating the orientation of the PC.
+        """
+        
+        #import numpy as np
+        #import pandas as pd
+        from scipy.stats import pearsonr, spearmanr, kendalltau
+        # Helper functions
+
+        def apply_threshold_to_genescore(gscore, thr):
+            # Apply quantile thresholding as in R code:
+            # abs(gscore) >= quantile(abs(gscore), Thr)
+            q_val = np.quantile(np.abs(gscore), thr)
+            return np.abs(gscore) >= q_val
+
+        def correlation_function(method):
+            if method == 'pearson':
+                return pearsonr
+            elif method == 'spearman':
+                return spearmanr
+            elif method == 'kendall':
+                return kendalltau
+            else:
+                raise ValueError("Invalid CorMethod. Choose 'pearson', 'spearman', or 'kendall'.")
+
+        def cor_test(x, y, method, thr):
+            """
+            Emulate cor.test logic:
+            If Thr is not None, we return (pvalue, estimate).
+            If Thr is None, we return (nan, correlation) because no test is required per the original R code.
+            """
+            func = correlation_function(method)
+            corr, pval = func(x, y)
+            if Thr is None:
+                # No p-value thresholding in R means just return correlation with no p-value
+                return (np.nan, corr)
+            else:
+                # With Thr, we actually consider p-value from the test
+                return (pval, corr)
+
+        def print_msg(msg):
+            # Just print messages as R code does
+            print(msg)
+
+        # Ensure Wei is a numpy array if provided
+        if Wei is not None:
+            Wei = np.asarray(Wei, dtype=float)
+        else:
+            Wei = np.full_like(GeneScore, np.nan)
+
+        # MODE: 'none'
+        if Mode == 'none':
+            print_msg("Orienting PC using a random direction")
             return 1
 
-        if mode == 'PreferActivation':
-            print("Orienting PC by preferential activation")
-            to_use = np.full(len(gene_score), True)
-            if thr is not None:
-                abs_gene_score = np.abs(gene_score)
-                threshold = np.quantile(abs_gene_score, thr)
-                to_use = abs_gene_score >= threshold
-            if np.sum(gene_score[to_use]) < 0:
+        # MODE: 'PreferActivation'
+        if Mode == 'PreferActivation':
+            print_msg("Orienting PC by preferential activation")
+            ToUse = np.full(len(GeneScore), True, dtype=bool)
+            if Thr is not None:
+                ToUse = apply_threshold_to_genescore(GeneScore, Thr)
+
+            if np.sum(GeneScore[ToUse]) < 0:
                 return -1
             else:
                 return 1
 
-        if mode == 'UseAllWeights':
-            print(f"Missing gene weights will be replaced by {def_wei}")
-            if wei is None:
-                wei = np.full(len(gene_score), def_wei)
-            else:
-                wei = np.where(np.isnan(wei), def_wei, wei)
-            mode = 'UseKnownWeights'
+        # MODE: 'UseAllWeights'
+        if Mode == 'UseAllWeights':
+            print_msg(f"Missing gene weights will be replaced by {DefWei}")
+            Wei = np.where(np.isnan(Wei), DefWei, Wei)
+            Mode = 'UseKnownWeights'
 
-        if mode == 'UseKnownWeights':
-            print("Orienting PC by combining PC weights and gene weights")
-            print(f"Missing gene weights will be replaced by {0}")
-            if wei is None:
-                wei = np.zeros(len(gene_score))
-            else:
-                wei = np.where(np.isnan(wei), 0, wei)
-            to_use = np.full(len(gene_score), True)
-            if thr is not None:
-                abs_gene_score = np.abs(gene_score)
-                threshold = np.quantile(abs_gene_score, thr)
-                to_use = abs_gene_score >= threshold
-            valid_indices = (~np.isnan(wei)) & to_use
-            if np.sum(valid_indices) < 1:
-                print("Not enough weights, PC will be oriented randomly")
+        # MODE: 'UseKnownWeights'
+        if Mode == 'UseKnownWeights':
+            print_msg("Orienting PC by combining PC weights and gene weights")
+            print_msg("Missing gene weights will be replaced by 0")
+            Wei = np.where(np.isnan(Wei), 0, Wei)
+
+            ToUse = np.full(len(GeneScore), True)
+            if Thr is not None:
+                ToUse = apply_threshold_to_genescore(GeneScore, Thr)
+
+            mask = (~np.isnan(Wei)) & ToUse
+            if np.sum(mask) < 1:
+                print_msg("Not enough weights, PC will be oriented randomly")
                 return 1
-            if np.sum(wei[valid_indices] * gene_score[valid_indices]) < 0:
+
+            if np.sum(Wei[mask] * GeneScore[mask]) < 0:
                 return -1
             else:
                 return 1
 
-        if mode == 'UseMeanExpressionAllWeights':
-            print(f"Missing gene weights will be replaced by {def_wei}")
-            if wei is None:
-                wei = np.full(len(gene_score), def_wei)
-            else:
-                wei = np.where(np.isnan(wei), def_wei, wei)
-            mode = 'UseMeanExpressionKnownWeights'
+        # MODE: 'CorrelateAllWeightsByGene'
+        if Mode == 'CorrelateAllWeightsByGene':
+            print_msg(f"Missing gene weights will be replaced by {DefWei}")
+            Wei = np.where(np.isnan(Wei), DefWei, Wei)
+            Mode = 'CorrelateKnownWeightsByGene'
 
-        if mode == 'UseMeanExpressionKnownWeights':
-            if wei is None or np.sum(~np.isnan(wei)) < 1:
-                print("Not enough weights, PC will be oriented randomly")
+        # MODE: 'CorrelateKnownWeightsByGene'
+        if Mode == 'CorrelateKnownWeightsByGene':
+            print_msg(f"Orienting PC by correlating gene expression and sample score ({CorMethod})")
+
+            if np.sum(~np.isnan(Wei)) < 1:
+                print_msg("Not enough weights, PC will be oriented randomly")
                 return 1
-            if exp_mat is None:
-                print("ExpMat not specified, PC will be oriented randomly")
+
+            if Grouping is not None:
+                print_msg("Using groups")
+                group_series = pd.Series(Grouping)
+                # Check if we have enough groups
+                TB = group_series.value_counts()
+                if (TB > 0).sum() < 2:
+                    print_msg("Not enough groups, PC will be oriented randomly")
+                    return 1
+
+                # Subset ExpMat to genes with non-NA Wei
+                SelGenesWei_mask = ~np.isnan(Wei)
+                SelGenes = ExpMat.index[SelGenesWei_mask]
+                # Compute group medians for each gene
+                # GroupMedians: for each gene, median expression by group
+                # We'll store a dict of Series: gene -> Series of medians by group
+                GroupMedians = {}
+                for gene in SelGenes:
+                    df_gene = pd.DataFrame({'val': ExpMat.loc[gene, :].values,
+                                            'Group': group_series[ExpMat.columns].values})
+                    median_by_group = df_gene.groupby('Group')['val'].median()
+                    GroupMedians[gene] = median_by_group
+
+                # MedianProj: median of SampleScore by group
+                df_score = pd.DataFrame({'Score': SampleScore, 'Group': group_series[ExpMat.columns].values})
+                MedianProj = df_score.groupby('Group')['Score'].median()
+
+                print_msg("Computing correlations")
+                # We must compute correlations for each gene (with non-NA Wei) between gene group medians and MedianProj
+                # Cor.Test.Vect: 2D structure. We'll store in arrays:
+                # We'll store p-values and estimates for each gene
+                gene_list = list(GroupMedians.keys())
+                pvals = []
+                cors = []
+                for gene in gene_list:
+                    x = GroupMedians[gene]
+                    # Align with MedianProj:
+                    # Ensure same groups in both
+                    common_groups = x.index.intersection(MedianProj.index)
+                    if len(common_groups) < 3:
+                        # Not enough data to correlate meaningfully
+                        pvals.append(np.nan)
+                        cors.append(np.nan)
+                        continue
+
+                    gx = x.loc[common_groups].values
+                    gy = MedianProj.loc[common_groups].values
+                    pval, cor_est = cor_test(gx, gy, CorMethod, Thr)
+                    pvals.append(pval)
+                    cors.append(cor_est)
+
+                CorTestVect = np.array([pvals, cors])
+
+                # Apply weights
+                SelGenesWei = Wei[SelGenesWei_mask]
+                # Align SelGenesWei with gene_list
+                # gene_list are the selected genes in order. SelGenes is also in order of ExpMat index
+                # Assume order matches ExpMat indexing:
+                # We'll create a map gene->index to ensure alignment is correct
+                # In R code: names(SelGenesWei) <- names(GroupMedians)
+                # Just assume alignment by order:
+                # CorTestVect[2,:] is correlation estimates for these genes
+                # Now we filter by Wei and correlation:
+                ToUse = ~np.isnan(CorTestVect[1, :])
+                if Thr is not None:
+                    # p-value threshold: (CorTestVect[0,i] < Thr)
+                    ToUse = (CorTestVect[0, :] < Thr) & ToUse
+
+                # Weighted sum of correlations:
+                # Only use genes with not NA Wei
+                if np.sum(ToUse) == 0:
+                    # No usable genes
+                    return 1
+
+                weighted_sum = np.sum(CorTestVect[1, ToUse] * SelGenesWei[ToUse])
+                if weighted_sum > 0:
+                    return 1
+                else:
+                    return -1
+
+            else:
+                print_msg("Not using groups")
+                # names(SampleScore) <- colnames(ExpMat)
+                # Compute correlation gene by gene:
+                print_msg("Computing correlations")
+                pvals = []
+                cors = []
+                for i, gene_val in enumerate(ExpMat.values):
+                    # gene_val is expression vector of a gene across samples
+                    # Filter if enough variation:
+                    if len(np.unique(gene_val)) <= 2 or len(np.unique(SampleScore)) <= 2:
+                        pvals.append(np.nan)
+                        cors.append(np.nan)
+                        continue
+                    pval, cor_est = cor_test(gene_val, SampleScore, CorMethod, Thr)
+                    pvals.append(pval)
+                    cors.append(cor_est)
+
+                CorTestVect = np.array([pvals, cors])
+
+                print_msg("Correcting using weights")
+                # If sum(!is.na(Wei))>1 then multiply corresponding correlations by Wei
+                non_na_wei_mask = ~np.isnan(Wei)
+                if np.sum(non_na_wei_mask) > 1:
+                    CorTestVect[1, non_na_wei_mask] = CorTestVect[1, non_na_wei_mask] * Wei[non_na_wei_mask]
+
+                ToUse = ~np.isnan(CorTestVect[1, :])
+                if Thr is not None:
+                    ToUse = (CorTestVect[0, :] < Thr) & ToUse
+
+                if np.sum(CorTestVect[1, ToUse]) > 0:
+                    return 1
+                else:
+                    return -1
+
+        # MODE: 'CorrelateAllWeightsBySample'
+        if Mode == 'CorrelateAllWeightsBySample':
+            print_msg(f"Missing gene weights will be replaced by {DefWei}")
+            Wei = np.where(np.isnan(Wei), DefWei, Wei)
+            Mode = 'CorrelateKnownWeightsBySample'
+
+        # MODE: 'CorrelateKnownWeightsBySample'
+        if Mode == 'CorrelateKnownWeightsBySample':
+            print_msg(f"Orienting PC by correlating gene expression and PC weights ({CorMethod})")
+
+            if np.sum(~np.isnan(Wei)) < 1:
+                print_msg("Not enough weights, PC will be oriented randomly")
                 return 1
-            to_use = np.full(len(gene_score), True)
-            if thr is not None:
-                threshold_high = np.quantile(gene_score, thr)
-                threshold_low = np.quantile(gene_score, 1 - thr)
-                to_use = (gene_score >= max(threshold_high, 0)) | (gene_score <= min(0, threshold_low))
-            nb_used = np.sum(to_use)
-            if nb_used < 2:
-                if nb_used == 1:
-                    mean_exp = np.mean(exp_mat, axis=1) - np.mean(exp_mat)
-                    if np.sum(gene_score[to_use] * wei[to_use] * mean_exp[to_use]) > 0:
+
+            # GeneScore * Wei
+            WeightedGeneScore = np.copy(GeneScore)
+            WeightedGeneScore[np.isnan(Wei)] = 0
+            WeightedGeneScore = WeightedGeneScore * Wei
+
+            if Grouping is not None:
+                print_msg("Using groups")
+                group_series = pd.Series(Grouping)
+                TB = group_series.value_counts()
+                if (TB > 0).sum() < 2:
+                    print_msg("Not enough groups, PC will be oriented randomly")
+                    return 1
+
+                # Compute group medians of each gene:
+                # GroupMedians: apply(ExpMat, 1, function(x) aggregate by group median)
+                # We'll create a 3D structure is complicated. In R:
+                # They do `GroupMedians <- apply(ExpMat, 1, function(x) {aggregate(...)})`
+                # This returns a list of data frames per gene. We only need final correlation:
+                # Actually, we need median expression per group for each gene?
+
+                # Actually "CorrelateKnownWeightsBySample" block:
+                # GroupMedians <- apply(ExpMat, 1, function(x) {
+                #   aggregate(x, by=list(AssocitedGroups), FUN=median)
+                # })
+                # Then they sapply something and do correlations by row:
+                # Finally they do correlation by groups of the medianed data vs GeneScore*Wei
+
+                # Let's do: For each gene, median by group:
+                # But they then do correlation per group row. Actually they do:
+                # Correlation is applied row-wise to MediansByGroups:
+                # MediansByGroups is a matrix with each row a group and each column a gene median?
+                # In R code:
+                # GroupMedians: a list for each gene. Then sapply returns a matrix (like pivot)
+                # We'll construct a matrix (Groups x Genes) of median expression:
+                gene_names = ExpMat.index
+                sample_names = ExpMat.columns
+                df_long = ExpMat.copy()
+                df_long = df_long.T  # samples x genes
+                df_long['Group'] = group_series[sample_names].values
+                # Compute median by group for each gene
+                median_by_group = df_long.groupby('Group').median()  # DataFrame with groups as rows, genes as columns
+
+                # Now median_by_group is (Groups x Genes)
+                # They do correlation row-wise with GeneScore*Wei:
+                # We want to correlate each row of median_by_group (across genes) with WeightedGeneScore
+                # WeightedGeneScore is per gene. So we correlate across genes:
+                print_msg("Computing correlations")
+                pvals = []
+                cors = []
+                for i in range(median_by_group.shape[0]):
+                    x = median_by_group.iloc[i, :].values  # median expression of all genes in this group
+                    # Correlate x with WeightedGeneScore
+                    # Check if enough variation:
+                    if len(np.unique(x)) > 2 and len(np.unique(WeightedGeneScore)) > 2:
+                        pval, cor_est = cor_test(x, WeightedGeneScore, CorMethod, Thr)
+                        pvals.append(pval)
+                        cors.append(cor_est)
+                    else:
+                        pvals.append(np.nan)
+                        cors.append(np.nan)
+
+                CorTestVect = np.array([pvals, cors])
+                ToUse = ~np.isnan(CorTestVect[1, :])
+                if Thr is not None:
+                    ToUse = (CorTestVect[0, :] < Thr) & ToUse
+
+                if np.sum(CorTestVect[1, ToUse]) > 0:
+                    return 1
+                else:
+                    return -1
+
+            else:
+                print_msg("Not using groups")
+
+                # names(GeneScore) <- rownames(ExpMat)
+                # WeightedGeneScore = GeneScore*Wei done above
+
+                # In R code: They do correlation column-wise:
+                # Cor.Test.Vect <- apply(ExpMat, 2, function(x){cor.test(x, GeneScore*Wei)})
+                # So we correlate each sample (column) expression vector with WeightedGeneScore
+
+                # Actually, at "CorrelateKnownWeightsBySample" last part:
+                # They do:
+                #   names(GeneScore) <- rownames(ExpMat)
+                #   GeneScore <- GeneScore*Wei
+                #   Cor.Test.Vect <- apply(ExpMat, 2, function(x) cor.test(x, GeneScore))
+                # This means we correlate each sample's expression (vertical vector from ExpMat) with WeightedGeneScore across genes.
+
+                pvals = []
+                cors = []
+                # apply(ExpMat, 2, ...) means column-wise in R, so each column is a sample
+                for col in ExpMat.columns:
+                    x = ExpMat[col].values  # gene expression in this sample
+                    # Correlate x with WeightedGeneScore across genes
+                    if len(np.unique(x)) > 2 and len(np.unique(WeightedGeneScore)) > 2:
+                        pval, cor_est = cor_test(x, WeightedGeneScore, CorMethod, Thr)
+                        pvals.append(pval)
+                        cors.append(cor_est)
+                    else:
+                        pvals.append(np.nan)
+                        cors.append(np.nan)
+
+                CorTestVect = np.array([pvals, cors])
+                ToUse = ~np.isnan(CorTestVect[1, :])
+                if Thr is not None:
+                    ToUse = (CorTestVect[0, :] < Thr) & ToUse
+
+                if np.sum(CorTestVect[1, ToUse]) > 0:
+                    return 1
+                else:
+                    return -1
+
+        # MODE: 'UseMeanExpressionAllWeights'
+        if Mode == 'UseMeanExpressionAllWeights':
+            print_msg(f"Missing gene weights will be replaced by {DefWei}")
+            Wei = np.where(np.isnan(Wei), DefWei, Wei)
+            Mode = 'UseMeanExpressionKnownWeights'
+
+        # MODE: 'UseMeanExpressionKnownWeights'
+        if Mode == 'UseMeanExpressionKnownWeights':
+            if np.sum(~np.isnan(Wei)) < 1:
+                print_msg("Not enough weights, PC will be oriented randomly")
+                return 1
+            if ExpMat is None:
+                print_msg("ExpMat not specified, PC will be oriented randomly")
+                return 1
+
+            ToUse = np.full(len(GeneScore), True)
+            if Thr is not None:
+                # (GeneScore >= max(quantile(GeneScore, Thr),0)) | (GeneScore <= min(0, quantile(GeneScore,1-Thr)))
+                q_thr_high = np.quantile(GeneScore, Thr)
+                q_thr_low = np.quantile(GeneScore, 1 - Thr)
+                ToUse = (GeneScore >= max(q_thr_high, 0)) | (GeneScore <= min(0, q_thr_low))
+
+            nbUsed = np.sum(ToUse)
+            if nbUsed < 2:
+                if nbUsed == 1:
+                    # In R code: ExpMat <- scale(apply(ExpMat, 1, median), center=TRUE, scale=FALSE)
+                    # apply(ExpMat,1,median) gives a median per gene: a vector of length=ngenes
+                    # scale(...) center=TRUE means subtract mean
+                    median_per_gene = ExpMat.median(axis=1).values
+                    centered_median = median_per_gene - np.mean(median_per_gene)
+                    val = np.sum(GeneScore[ToUse] * Wei[ToUse] * centered_median[ToUse])
+                    if val > 0:
                         return 1
                     else:
                         return -1
                 else:
-                    print("No weight considered, PC will be oriented randomly")
+                    print_msg("No weight considered, PC will be oriented randomly")
                     return 1
-            mean_exp = np.mean(exp_mat[to_use, :], axis=1) - np.mean(exp_mat[to_use, :])
-            if np.sum(gene_score[to_use] * wei[to_use] * mean_exp) > 0:
+
+            # For nbUsed >= 2:
+            # ExpMat[ToUse, ] means subset genes
+            subset_mat = ExpMat.iloc[ToUse, :]
+            # apply(...,1,median)
+            median_per_gene = subset_mat.median(axis=1).values
+            centered_median = median_per_gene - np.mean(median_per_gene)
+            val = np.sum(GeneScore[ToUse]*Wei[ToUse]*centered_median)
+            if val > 0:
                 return 1
             else:
                 return -1
 
-        # Implement other modes if necessary...
-
-        print("Invalid mode specified, PC will be oriented randomly")
+        # If none of the above conditions matched, default:
         return 1
 
 
@@ -349,18 +659,18 @@ class ROMA:
         wei = self.gene_weights.get(gene_set_name, None)
         # exp_mat is data (genes x samples)
         correct_sign = self.fix_pc_sign(
-            gene_score=gene_score,
-            sample_score=sample_score,
-            wei=wei,
-            def_wei=self.def_wei,
-            mode=self.pc_sign_mode,
-            thr=self.pc_sign_thr,
-            grouping=None,
-            exp_mat=data,
-            cor_method=self.cor_method
+            GeneScore=gene_score,
+            SampleScore=sample_score,
+            Wei=wei,
+            DefWei=self.def_wei,
+            Mode=self.pc_sign_mode,
+            Thr=self.pc_sign_thr,
+            Grouping=None,
+            ExpMat=data,
+            CorMethod=self.cor_method
         )
-        return correct_sign * pc1
 
+        return correct_sign * pc1
 
 
     def old_orient_pc1(self, pc1, data):
@@ -373,74 +683,6 @@ class ROMA:
             return -pc1
         return pc1
     
-    def old_2_orient_pc1(self, pc1, data, gene_set_name=None):
-        ### give correlation coefficient = 0.286 with the rROMA resutls (median expr)
-        """
-        Orient PC1 according to the methods in Matthieu's paper:
-        - If gene signs are available, use them to maximize agreement.
-        - Else, use the method based on extreme weights.
-        """
-        # TODO: if the apriori information is available
-        # Check if gene signs are available for this gene set
-        if hasattr(self, 'gene_signs') and gene_set_name in self.gene_signs:
-            print("i'm here")
-            # Get the signs for the genes in this gene set
-            gene_signs = self.gene_signs[gene_set_name]  # Dictionary {gene_name: sign}
-            # Get the projections of genes onto PC1
-            # pc1 is the first principal component (weights for each gene)
-            # data is the gene expression data (genes x samples)
-            # Assuming genes are rows in data
-            gene_names = self.subset.var.index.tolist()
-            #pc1_projections = pc1  # ??? # Corresponds to genes in self.subset.var
-            # Calculate agreement
-            agreement = 0
-            agreement_flipped = 0
-            for i, gene in enumerate(gene_names):
-                sign = gene_signs.get(gene, 0)
-                projection = pc1_projections[i]
-                if sign > 0 and projection > 0:
-                    agreement += 1
-                elif sign < 0 and projection < 0:
-                    agreement += 1
-                # Flipped orientation
-                flipped_projection = -projection
-                if sign > 0 and flipped_projection > 0:
-                    agreement_flipped += 1
-                elif sign < 0 and flipped_projection < 0:
-                    agreement_flipped += 1
-            # Choose the orientation that maximizes the agreement
-            if agreement_flipped > agreement:
-                return -pc1
-            else:
-                return pc1
-        else:
-            #print('else', end=' | ')
-            # No gene signs available, use extreme weights method
-            # use loadings instead of pc1
-            loadings_1 = pc1 @ data.T
-            extreme_percent = self.extreme_percent
-            #print('1', end=' | ')
-            num_genes = len(loadings_1)
-            #print('2', str(num_genes), end=' | ')
-            num_extreme = max(1, int(num_genes * extreme_percent))
-            #print('3', end=' | ')
-            # Get indices of genes with largest absolute weights
-            sorted_indices = np.argsort(np.abs(loadings_1))[::-1]
-            #print('3', end=' | ')
-            extreme_indices = sorted_indices[:num_extreme]
-            #print('4', end=' | ')
-            # Multiply the weights by the expression levels
-            extreme_weights = loadings_1[extreme_indices]
-            #print('5', end=' | ')
-            extreme_expr = data[extreme_indices, :].mean(axis=1) # Mean expression per gene
-            #print('6', end=' | ')
-            result = np.sum(extreme_weights * extreme_expr)
-            #print('7')
-            # If result is negative, flip pc1
-            if result < 0:
-                return -pc1
-            else:
-                return pc1
             
     def compute_median_exp(self, svd_, X):
         """
