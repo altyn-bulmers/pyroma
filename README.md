@@ -4,6 +4,10 @@
 
 `conda env create -f environment.yml`
 
+### Install using pip
+
+`pip install roma-analysis`
+
 
 ### Jupyter Notebooks
 
