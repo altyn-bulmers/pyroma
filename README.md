@@ -1,4 +1,6 @@
-# pyROMA_shared
+# pyROMA
+
+Representation and Quantification of Module Activity in single cell and bulk transcriptomics
 
 ### Create the conda environment
 
@@ -9,6 +11,19 @@
 `pip install roma-analysis`
 
 
+# Clone main repo with submodules
+`git clone --recurse-submodules git@github.com:yourusername/pyroma.git`
+
+
+## Reproducibility
+Jupyter notebooks demonstrating the usage and reproducibility of results can be found in our companion repository: [pyroma_reproducibility](https://github.com/yourusername/pyroma_reproducibility)
+
+
+# PYROMA Reproducibility
+This repository contains Jupyter notebooks demonstrating the usage of [PYROMA](https://github.com/yourusername/pyroma) and reproducing results from the paper.
+Contains the comparison of rROMA to pyROMA in stats and plots
+rade_data - is a pseudo bulk normalized data from Sofia Orozco
+
 ### Jupyter Notebooks
 
 `45_rROMA_dataset_from_R_hallmarks.ipynb` - illustrates the Scenario #1: comparison of CF and healthy control samples
@@ -17,9 +32,7 @@
 
 `47_test_the_plotting.ipynb` - explores the plotting functions
 
+
 Datasets are downloaded from https://github.com/sysbio-curie/rRoma_comp and exported as .tsv files to `datasets` folder
 
 
-### rade_data branch
-Contains the comparison of rROMA to pyROMA in stats and plots
-rade_data - is a pseudo bulk normalized data from Sofia Orozco
