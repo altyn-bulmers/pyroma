@@ -3,7 +3,8 @@ import time
 from scipy import stats
 import scanpy as sc
 import multiprocessing
-from .utils import *
+#from .utils import *
+from utils import *
 
 ### TODO: solve the confusion btwn namings: q values (which are adj p-values) and p_values()
 ### Should be: p values L1, p values Med Exp, q values L1, q values Med Exp
@@ -11,14 +12,15 @@ from .utils import *
 class ROMA:
     
     # TODO in plotting : handle many genesets, heatmap (?) 
-    from .plotting import plotting as pl 
+    #from .plotting import plotting as pl 
     #TODO: initialize pl.adata with roma.adata
-    pl = pl()
+    #pl = pl()
     
     def __init__(self):
         self.adata = None
         self.gmt = None
         self.genesets = {}
+        self.idx = None
         self.approx_int = 20 # Granularity of the null geneset size, from 0 to 100, less is more precise
         self.min_n_genes = 10
         self.nullgenesetsize = None
@@ -74,15 +76,31 @@ class ROMA:
         self.genesets = genesets
         return genesets
         
+    def indexing(self, adata):
+        idx = adata.var.index.tolist()
+        idx_set = set(idx)
+        self.idx = list(idx_set)
+        return 
+    
     def subsetting(self, adata, geneset, verbose=0):
         #adata
         #returns subset and subsetlist
 
         if verbose:
             print(' '.join(x for x in geneset))
-        idx = adata.var.index.tolist()
-        subsetlist = list(set(idx) & set(geneset))
-        subset = adata[:, [x for x in subsetlist]]
+        
+        # TODO: errors if idx is not there
+        #idx = adata.var.index.tolist()
+        #idx_set = set(idx)
+        
+        if not self.idx: 
+            print('No adata idx detected in ROMA')
+        # self.idx must be a list 
+        
+        #subsetlist = list(set(idx) & set(geneset))
+        
+        subsetlist = geneset[np.isin(geneset, self.idx)]
+        subset = adata[:, subsetlist]
         self.subset = subset
         self.subsetlist = subsetlist
         return subset, subsetlist
@@ -1160,7 +1178,8 @@ class ROMA:
             X_centered = X - X.mean(axis=0)
         
         self.adata.X = X_centered.T 
-
+        
+        self.indexing(self.adata)
         self.read_gmt_to_dict(self.gmt)
 
         # to mark the first one
