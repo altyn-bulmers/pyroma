@@ -1,9 +1,9 @@
 README.md
 setup.cfg
 setup.py
-pyroma/ROMA.py
 pyroma/__init__.py
 pyroma/plotting.py
+pyroma/roma.py
 pyroma/utils.py
 roma_analysis.egg-info/PKG-INFO
 roma_analysis.egg-info/SOURCES.txt
