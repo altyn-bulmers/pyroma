@@ -11,9 +11,9 @@ from .utils import *
 class ROMA:
     
     # TODO in plotting : handle many genesets, heatmap (?) 
-    #from .plotting import plotting as pl 
+    from .plotting import plotting as pl 
     #TODO: initialize pl.adata with roma.adata
-    #pl = pl()
+    pl = pl()
     
     def __init__(self):
         self.adata = None
@@ -259,7 +259,7 @@ class ROMA:
             DefWei (float): Default weight for missing weights.
             Thr (float or None): Quantile threshold or p-value threshold depending on context.
             Grouping (dict, pd.Series, or None): Maps sample names to groups.
-            ExpMat (pd.DataFrame or None): Expression matrix (genes x samples).
+            ExpMat (numpy.array or None): Expression matrix (genes x samples).
             CorMethod (str): One of "pearson", "spearman", "kendall".
 
         Returns:
@@ -455,7 +455,7 @@ class ROMA:
                 print_msg("Computing correlations")
                 pvals = []
                 cors = []
-                for i, gene_val in enumerate(ExpMat.values):
+                for i, gene_val in enumerate(ExpMat):
                     # gene_val is expression vector of a gene across samples
                     # Filter if enough variation:
                     if len(np.unique(gene_val)) <= 2 or len(np.unique(SampleScore)) <= 2:
@@ -650,9 +650,12 @@ class ROMA:
 
             # For nbUsed >= 2:
             # ExpMat[ToUse, ] means subset genes
-            subset_mat = ExpMat.iloc[ToUse, :]
+            #subset_mat = ExpMat.iloc[ToUse, :]
+            subset_mat = ExpMat[:, ToUse]
             # apply(...,1,median)
-            median_per_gene = subset_mat.median(axis=1).values
+            #median_per_gene = subset_mat.median(axis=1).values
+            median_per_gene = np.median(subset_mat, axis=0)
+
             centered_median = median_per_gene - np.mean(median_per_gene)
             val = np.sum(GeneScore[ToUse]*Wei[ToUse]*centered_median)
             if val > 0:
@@ -708,8 +711,8 @@ class ROMA:
 
         pc1, pc2 = svd_.components_
         # Orient PC1
-        #pc1 = self.orient_pc1(pc1, X)
-        pc1 = self.old_orient_pc1(pc1, X)
+        pc1 = self.orient_pc1(pc1, X)
+        #pc1 = self.old_orient_pc1(pc1, X)
         projections_1 = X @ pc1 # the scores that each gene have in the sample space
         projections_2 = X @ pc2
         #print('shape of projections should corresponds to n_genes', projections.shape)
@@ -1059,12 +1062,12 @@ class ROMA:
 
     def approx_size(self, flag):
         """
-        # Approximate size
-        # For current subset and gene set -> we compute the null gene set size
-        # add it to the dictionary of null gene set sizes
-        # for the next one, we calculate if the closest size in dictionary is smaller by k(approx_int) to ours
-        # if smaller -> we just use the same distribution from the dictionary (as it is computed)
-        # is larger -> we create a new 
+        Approximate size
+        For current subset and gene set -> we compute the null gene set size
+        add it to the dictionary of null gene set sizes
+        for the next one, we calculate if the closest size in dictionary is smaller by k(approx_int) to ours
+        if smaller -> we just use the same distribution from the dictionary (as it is computed)
+        is larger -> we create a new 
         """
         candidate_nullgeneset_size = sum(1 for i in range(len(self.subsetlist)) if i not in self.outliers)
 
@@ -1288,8 +1291,32 @@ class ROMA:
         return 
 
     
-    
-    
+    def save_ROMA_results(adata, path):
+        # saves the adata to a path
+        import pickle 
+        d = adata.uns['ROMA']
+
+        with open(f'{path}.pickle', 'wb') as handle:
+            pickle.dump(d, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        del adata.uns['ROMA']
+        adata.write(f"{path}.h5ad")
+
+        return
+
+    def load_ROMA_results(path):
+        # loads the results into adata
+        import pickle
+        import scanpy as sc 
+
+        with open(f'{path}.pickle', 'rb') as handle:
+            d = pickle.load(handle)
+
+        adata = sc.read_h5ad(f'{path}.h5ad')
+        adata.uns['ROMA'] = d
+
+        return adata
+        
     
     
     
