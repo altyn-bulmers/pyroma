@@ -3,13 +3,13 @@ from distutils.core import setup
 setup(
   name = 'roma-analysis',         # How you named your package folder (MyLib)
   packages = ['pyroma'],   # Chose the same as "name"
-  version = '0.1.3',      # Start with a small number and increase it with every change you make
+  version = '0.1.4',      # Start with a small number and increase it with every change you make
   license='GPL-3.0',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Representation and Quantification of Module Activity for bulk and single cell transcriptomics in python',   # Give a short description about your library
   author = 'Altynbek Zhubanchaliyev',                   # Type in your name
   author_email = 'altynbek.zhubanchaliyev@curie.fr',      # Type in your E-Mail
   url = 'https://github.com/altyn-bulmers',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.1.3.tar.gz',    # I explain this later on
+  download_url = 'https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.1.4.tar.gz',    # I explain this later on
   keywords = ['python', 'bioinformatics', 'machine-learning', 
               'pathway-activity', 'transcriptomics', 'rnaseq', 'single-cell-rna-seq', 
               ],   # Keywords that define your package best

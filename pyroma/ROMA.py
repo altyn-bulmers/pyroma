@@ -3,8 +3,7 @@ import time
 from scipy import stats
 import scanpy as sc
 import multiprocessing
-#from .utils import *
-from utils import *
+from .utils import *
 
 ### TODO: solve the confusion btwn namings: q values (which are adj p-values) and p_values()
 ### Should be: p values L1, p values Med Exp, q values L1, q values Med Exp
