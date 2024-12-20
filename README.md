@@ -1,18 +1,20 @@
 # pyROMA
 
-Representation and Quantification of Module Activity in single cell and bulk transcriptomics
+Representation and Quantification of Module Activity in single cell and bulk transcriptomics[1, 2].
 
-### Create the conda environment
+## Create the conda environment
 
-`conda env create -f environment.yml`
+```sh
+conda env create -f environment.yml
+```
 
-### Install using pip
+## Install using pip
 
 ```sh
 pip install roma-analysis
 ```
 
-### Run roma on your data
+## Run roma on your data
 
 ```py
 import pyroma`
@@ -22,13 +24,20 @@ roma.gmt = 'h.all.v2023.2.Hs.symbols.gmt'
 roma.compute()
 ```
 
-# Clone main repo with submodules
-`git clone --recurse-submodules git@github.com:yourusername/pyroma.git`
+## Clone main repo with submodules
+```sh
+git clone --recurse-submodules git@github.com:yourusername/pyroma.git
+```
 
 
 ## Reproducibility
 Jupyter notebooks demonstrating the usage and reproducibility of results can be found in our companion repository: [pyroma_reproducibility](https://github.com/altyn-bulmers/pyroma_reproducibility)
 
 Datasets are downloaded from [here](https://github.com/sysbio-curie/rRoma_comp) and exported as .tsv files to `datasets` folder
+
+## References
+
+> 1.Martignetti L, Calzone L, Bonnet E, Barillot E and Zinovyev A (2016) ROMA: Representation and Quantification of Module Activity from Target Expression Data. Front. Genet. 7:18. doi: 10.3389/fgene.2016.00018
+2.Najm, M., Cornet, M., Albergante, L. et al. Representation and quantification of module activity from omics data with rROMA. npj Syst Biol Appl 10, 8 (2024). https://doi.org/10.1038/s41540-024-00331-x
 
 
