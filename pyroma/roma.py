@@ -1187,6 +1187,7 @@ class ROMA:
         # to mark the first one
         flag = True
         
+        # TODO: handle different selection of genesets 
         if selected_gene_sets == 'all':
             selected_gene_sets = self.genesets.keys()
 
@@ -1225,6 +1226,10 @@ class ROMA:
             #print('self.nulll1 :', self.nulll1)
             # Store the results for this gene set in a new instance of GeneSetResult
             
+            # didn;t affect the med exp values
+            #self.adata.X = self.adata.raw.X
+            #self.X = self.adata[:, self.subsetlist].X.T
+
             gene_set_result = self.GeneSetResult(self.subset, self.subsetlist, self.outliers, self.nullgenesetsize, 
                                                  self.svd, self.X, 
                                                  self.nulll1, self.null_median_exp, self.null_projections)
