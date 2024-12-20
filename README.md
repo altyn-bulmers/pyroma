@@ -8,14 +8,19 @@ Representation and Quantification of Module Activity in single cell and bulk tra
 
 ### Install using pip
 
-`pip install roma-analysis`
+```sh
+pip install roma-analysis
+```
 
+### Run roma on your data
 
-`import pyroma`
-`roma = pyroma.ROMA()`
-`roma.adata = adata`
-`roma.gmt = 'h.all.v2023.2.Hs.symbols.gmt'`
-`roma.compute()`
+```py
+import pyroma`
+roma = pyroma.ROMA()
+roma.adata = adata
+roma.gmt = 'h.all.v2023.2.Hs.symbols.gmt'
+roma.compute()
+```
 
 # Clone main repo with submodules
 `git clone --recurse-submodules git@github.com:yourusername/pyroma.git`
