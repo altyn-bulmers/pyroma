@@ -662,7 +662,42 @@ class ROMA:
                 return 1
             else:
                 return -1
+        if Mode == 'UseExtremeWeights':
+            """
+            This mode:
+            - Finds the top Thr fraction of genes by absolute PC weight.
+            - Multiplies those gene weights by the (mean) gene expression across samples.
+            - Sums the products. If the sum < 0 => flip sign (-1), else +1.
+            """
+            print_msg("Orienting PC by using the most extreme PC weights and gene expression.")
+            if ExpMat is None:
+                print_msg("No ExpMat provided. Orientation will be random.")
+                return 1
+            
+            # Step 1: Identify the top/bottom fraction of genes by abs(PC weight)
+            if Thr is None:
+                # If Thr is None, define some default or return random orientation
+                print_msg("No Thr provided. Using entire set of genes.")
+                ToUse = np.full(len(SampleScore), True, dtype=bool)
+            else:
+                cutoff = np.quantile(np.abs(SampleScore), 0.15) #1 - Thr)
+                ToUse = (np.abs(SampleScore) >= cutoff)
 
+            # Step 2: Compute the average expression of each gene across samples
+            #   ExpMat shape: (genes x samples)
+            #   so the mean expression of gene i => np.mean(ExpMat[i, :])
+            print('ok', end=' | ')
+            gene_means = np.mean(ExpMat, axis=1) #1
+            print('gene_means', end=' | ')
+            # Step 3: Sum up (GeneScore[i] * gene_means[i]) for the selected genes
+            sum_val = np.sum(SampleScore[ToUse] * gene_means[ToUse])
+            print('sum_val')
+
+            # Step 4: If sum < 0, flip sign
+            if sum_val < 0:
+                return 1
+            else:
+                return -1
         # If none of the above conditions matched, default:
         return 1
 
@@ -1171,6 +1206,7 @@ class ROMA:
         # and the "scale" function centering is done by subtracting the column means of x from their corresponding columns
         self.adata.raw = self.adata.copy()
         X = self.adata.X.T 
+        #X_raw = X.copy()
         
         if double_mean_centering:
             # centering across samples and genes
@@ -1181,6 +1217,12 @@ class ROMA:
         
         self.adata.X = X_centered.T 
         
+        # for pc sign
+        #adata_raw = self.adata.copy()
+        #X_centered = X_raw - X_raw.mean(axis=0)
+        #adata_raw.X = X_centered.T
+
+
         self.indexing(self.adata)
         self.read_gmt_to_dict(self.gmt)
 
@@ -1226,12 +1268,12 @@ class ROMA:
             #print('self.nulll1 :', self.nulll1)
             # Store the results for this gene set in a new instance of GeneSetResult
             
-            # didn;t affect the med exp values
-            #self.adata.X = self.adata.raw.X
-            #self.X = self.adata[:, self.subsetlist].X.T
+            # take the raw uncentered X for the fix pc sign calculation 
+
+            #raw_X_subset = adata_raw[:, self.subsetlist].X.T
 
             gene_set_result = self.GeneSetResult(self.subset, self.subsetlist, self.outliers, self.nullgenesetsize, 
-                                                 self.svd, self.X, 
+                                                 self.svd, self.X ,#instead of raw_X_subset
                                                  self.nulll1, self.null_median_exp, self.null_projections)
 
             gene_set_result.custom_name = f"GeneSetResult {gene_set_name}"
