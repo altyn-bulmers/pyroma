@@ -43,4 +43,3 @@ Martignetti L, Calzone L, Bonnet E, Barillot E and Zinovyev A (2016) ROMA: Repre
 
 Najm, M., Cornet, M., Albergante, L. et al. Representation and quantification of module activity from omics data with rROMA. npj Syst Biol Appl 10, 8 (2024). https://doi.org/10.1038/s41540-024-00331-x
 
-
