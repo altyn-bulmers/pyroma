@@ -28,6 +28,7 @@ class ROMA:
         self.outliers = []
         self.svd = None
         self.X = None
+        self.raw_X_subset = None
         self.nulll1 = []
         self.results = {}
         self.null_distributions = {}
@@ -173,13 +174,17 @@ class ROMA:
             #self.outliers_avg_proportion /= 2 
         else:    
             subset = [x for i, x in enumerate(subsetlist) if i not in outliers]
-        subset = adata[:, [x for x in subset]]
+        subset_adata = adata[:, [x for x in subset]]
 
         # Omitting the centering of the subset to obtain global centering: 
-        #X = subset.X - subset.X.mean(axis=0)
-        X = np.asarray(subset.X.T) 
+        #subset_adata.X = subset_adata.X - subset_adata.X.mean(axis=1, keepdims=True)
+        #matrix = subset_adata.X.T
+        #row_means = np.mean(matrix, axis=1, keepdims=True)
+        #X = matrix - row_means
+        #X = self.double_mean_center_matrix(matrix).T
+        X = np.asarray(subset_adata.X.T) 
         # Compute the SVD of X without the outliers
-        svd = TruncatedSVD(n_components=2, algorithm=algorithm, n_oversamples=2) #algorithm='arpack')
+        svd = TruncatedSVD(n_components=2, algorithm=algorithm)#, n_oversamples=2) #algorithm='arpack')
         svd.fit(X)
         #svd.explained_variance_ratio_ = (s ** 2) / (X.shape[0] - 1)
         if not for_randomset:
@@ -247,7 +252,8 @@ class ROMA:
     
 
     def fix_pc_sign(self, GeneScore, SampleScore, Wei=None, Mode='none', DefWei=1,
-                    Thr=None, Grouping=None, ExpMat=None, CorMethod="pearson"):
+                    Thr=None, Grouping=None, ExpMat=None, CorMethod="pearson",
+                    gene_set_name=None):
         """
         Python equivalent of the R FixPCSign function.
 
@@ -266,11 +272,19 @@ class ROMA:
             int: +1 or -1 indicating the orientation of the PC.
         """
         
+        
+
         #import numpy as np
         #import pandas as pd
         from scipy.stats import pearsonr, spearmanr, kendalltau
+        import os
+        
+        output_dir = '/home/az/Projects/01_Curie/06.1_pyROMA_Sofia_results/pyroma_debug/'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
         # Helper functions
-
+        
         def apply_threshold_to_genescore(gscore, thr):
             # Apply quantile thresholding as in R code:
             # abs(gscore) >= quantile(abs(gscore), Thr)
@@ -630,6 +644,7 @@ class ROMA:
                 q_thr_high = np.quantile(GeneScore, Thr)
                 q_thr_low = np.quantile(GeneScore, 1 - Thr)
                 ToUse = (GeneScore >= max(q_thr_high, 0)) | (GeneScore <= min(0, q_thr_low))
+                
 
             nbUsed = np.sum(ToUse)
             if nbUsed < 2:
@@ -650,18 +665,47 @@ class ROMA:
 
             # For nbUsed >= 2:
             # ExpMat[ToUse, ] means subset genes
-            #subset_mat = ExpMat.iloc[ToUse, :]
-            subset_mat = ExpMat[:, ToUse]
-            # apply(...,1,median)
-            #median_per_gene = subset_mat.median(axis=1).values
-            median_per_gene = np.median(subset_mat, axis=0)
+            
+            subset_mat = ExpMat[ToUse, :]
 
-            centered_median = median_per_gene - np.mean(median_per_gene)
-            val = np.sum(GeneScore[ToUse]*Wei[ToUse]*centered_median)
-            if val > 0:
-                return 1
-            else:
-                return -1
+            row_medians = np.median(subset_mat, axis=1)
+            centered_medians = np.array(row_medians - np.mean(row_medians))
+            centered_medians = centered_medians.reshape(1, -1)
+            val = np.sum(GeneScore[ToUse]*Wei[ToUse]*centered_medians)
+            #centered_medians = centered_medians.reshape(-1, 1)
+            
+            output_file = f'{output_dir}/{gene_set_name}.txt' 
+
+            with open(output_file, "w") as f:
+                f.write(f"Module: {gene_set_name}\n")
+                if centered_medians is not None:
+                    shape = centered_medians.shape
+                    #print(type(shape), type(centered_medians))
+                    #print('shape', shape)
+                    f.write(f"ExpMat Head: {centered_medians}\n")
+                    #f.write(f"Subset Mat: {subset_mat}\n")
+                    f.write(f"ExpMat Shape: {shape[0]} x {shape[1]}\n")
+                    
+                else:
+                    f.write("ExpMat Shape: N/A\n")
+                f.write(f"Raw ExpMat shape: {ExpMat.shape[0]} x {ExpMat.shape[1]}\n")
+                f.write(f"Raw ExpMat Head: {ExpMat[:5, :5]}\n")
+                f.write(f"GeneScore Shape: {len(GeneScore)}\n")
+                f.write(f"Gene Score: {GeneScore}\n")
+                f.write(f"GeneScore[ToUse] Shape: {len(GeneScore[ToUse])}\n")
+                f.write(f"GeneScore[ToUse]: {GeneScore[ToUse]}\n")
+                if val is not None:
+                    f.write(f"Computed val: {val}\n")
+                else:
+                    f.write("Computed val: N/A\n")
+
+                if val > 0:
+                    f.write(f"Fix PC Sign output: 1" )
+                    return 1
+                else:
+                    f.write(f"Fix PC Sign output: -1" )
+                    return -1
+
         if Mode == 'UseExtremeWeights':
             """
             This mode:
@@ -694,7 +738,7 @@ class ROMA:
             print('sum_val')
 
             # Step 4: If sum < 0, flip sign
-            if sum_val < 0:
+            if sum_val > 0:
                 return 1
             else:
                 return -1
@@ -703,16 +747,22 @@ class ROMA:
 
 
     
-    def orient_pc1(self, pc1, data, gene_set_name=None):
+    def orient_pc1(self, pc1, X, raw_X_subset, gene_set_name=None):
         """
         Orient PC1 according to the methods described.
         """
         # Get gene scores (loadings) and sample scores (projections)
-        gene_score = pc1
-        sample_score = data @ pc1
+        sample_score = pc1
+        gene_score = X @ pc1
+        #gene_score = raw_X_subset @ pc1
         # Get gene weights if available
         wei = self.gene_weights.get(gene_set_name, None)
+        #print("wei: ", wei)
         # exp_mat is data (genes x samples)
+        print(f"GeneScore shape: {gene_score.shape}")
+        print(f"ExpMat shape: {raw_X_subset.shape}")
+        #print("Outliers: ", self.outliers)
+
         correct_sign = self.fix_pc_sign(
             GeneScore=gene_score,
             SampleScore=sample_score,
@@ -721,40 +771,37 @@ class ROMA:
             Mode=self.pc_sign_mode,
             Thr=self.pc_sign_thr,
             Grouping=None,
-            ExpMat=data,
-            CorMethod=self.cor_method
+            ExpMat=raw_X_subset,
+            CorMethod=self.cor_method,
+            gene_set_name=gene_set_name
         )
-
-        return correct_sign * pc1
-
-
-    def old_orient_pc1(self, pc1, data):
-        # Orient PC1 to maximize positive correlation with mean expression
-        # TODO: if the user knows the orientation -> make it a hyperparameter 
-        # (e.g. in the direction of the gene expression of a certain gene)
-         
-        mean_expr = data.mean(axis=0) #genes are in rows
-        if np.corrcoef(pc1, mean_expr)[0, 1] < 0:
-            return -pc1
-        return pc1
+        
+        return correct_sign
     
             
-    def compute_median_exp(self, svd_, X):
+    def compute_median_exp(self, svd_, X, raw_X_subset, gene_set_name=None):
         """
         Computes the shifted pathway 
         """
 
+        #if X is None or X.shape[0] == 0:
+        #    print(f"Warning: X is empty for gene set {gene_set_name}, returning default values.")
+        #    return np.nan, np.array([]), np.array([])
+
         pc1, pc2 = svd_.components_
+        #raw_median_exp = np.median(X @ pc1)
         # Orient PC1
-        pc1 = self.orient_pc1(pc1, X)
-        #pc1 = self.old_orient_pc1(pc1, X)
+        correct_sign = self.orient_pc1(pc1, X, raw_X_subset, gene_set_name=gene_set_name)
+        pc1 = correct_sign * pc1
+        
         projections_1 = X @ pc1 # the scores that each gene have in the sample space
+        #print(f"Raw X shape: {X.shape}")
         projections_2 = X @ pc2
         #print('shape of projections should corresponds to n_genes', projections.shape)
         # Compute the median of the projections
         median_exp = np.median(projections_1) 
         # TODO: is median expression is calculated only with the pc1 projections?
-        return median_exp, projections_1, projections_2
+        return median_exp, projections_1, projections_2 #TODO: save gene scores after pc sign correction
 
 
     def process_iteration(self, sequence, idx, iteration, incremental, partial_fit, algorithm):
@@ -766,6 +813,7 @@ class ROMA:
         
         subset = np.random.choice(sequence, self.nullgenesetsize, replace=False)
         gene_subset = np.array([x for i, x in enumerate(idx) if i in subset])
+        
         outliers = self.loocv(self.adata[:,[x for x in gene_subset]], for_randomset=True)
         if incremental:
             svd_, X = self.robustIncrementalPCA(self.adata, gene_subset, outliers, for_randomset=True, partial_fit=partial_fit)
@@ -773,7 +821,9 @@ class ROMA:
             svd_, X = self.robustTruncatedSVD(self.adata, gene_subset, outliers, for_randomset=True, algorithm=algorithm)
             
         l1 = svd_.explained_variance_ratio_
-        median_exp, null_projections_1, null_projections_2 = self.compute_median_exp(svd_, X)
+        subsetlist = [x for i, x in enumerate(gene_subset) if i not in outliers]
+        #raw_X_subset = self.adata.raw[:, subsetlist].X.T.copy()
+        median_exp, null_projections_1, null_projections_2 = self.compute_median_exp(svd_, X, self.raw_X_subset)
 
         return l1, median_exp, null_projections_1, null_projections_2
         
@@ -1006,9 +1056,13 @@ class ROMA:
             ps[i] =  p_value #if p_value <= 1.0 else 1.0
             gene_set_result.test_l1 = test_l1
 
+            gene_set_name = gene_set_result.custom_name.split(maxsplit=1)[-1]
             # Median Exp statistic
-            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X)
-            q_value = (np.sum(null_median_distribution >= test_median_exp) + 1) / (len(null_median_distribution) + 1)
+
+            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X, gene_set_result.raw_X_subset, gene_set_name)
+            #test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X, gene_set_name)
+            q_value = (np.sum(np.abs(null_median_distribution) >= np.abs(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
+            #q_value = (np.sum((null_median_distribution) >=(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
             
             # from the rROMA 
             #_, wilcoxon_p_pc1_mean = wilcoxon(null_median_distribution - test_median_exp, alternative='greater')
@@ -1121,13 +1175,14 @@ class ROMA:
         return
     
     class GeneSetResult:
-        def __init__(self, subset, subsetlist, outliers, nullgenesetsize, svd, X, nulll1, null_median_exp, null_projections):
+        def __init__(self, subset, subsetlist, outliers, nullgenesetsize, svd, X, raw_X_subset, nulll1, null_median_exp, null_projections):
             self.subset = subset
             self.subsetlist = subsetlist
             self.outliers = outliers
             self.nullgenesetsize = nullgenesetsize
             self.svd = svd
             self.X = X
+            self.raw_X_subset = raw_X_subset
             self.projections_1 = None
             self.projections_2 = None
             self.nulll1 = nulll1
@@ -1187,7 +1242,7 @@ class ROMA:
         df['q Med Exp'] = pd.Series(q_dict)
         return df
     
-    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=True):        
+    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=False):        
         
         #pl.adata = self.adata
         """
@@ -1211,10 +1266,13 @@ class ROMA:
         if double_mean_centering:
             # centering across samples and genes
             X_centered = self.double_mean_center_matrix(X)
+
         else:
             # centering over samples, genes have 0 mean
-            X_centered = X - X.mean(axis=0)
-        
+            # replicates the behavior in R
+            X_centered = X - np.mean(X, axis=1, keepdims=True)
+            X_centered = X_centered - np.mean(X_centered, axis=0, keepdims=True)
+
         self.adata.X = X_centered.T 
         
         # for pc sign
@@ -1258,6 +1316,13 @@ class ROMA:
                 #self.robustKernelPCA(self.adata, self.subsetlist, self.outliers)
             else:
                 self.robustTruncatedSVD(self.adata, self.subsetlist, self.outliers, algorithm=algorithm)
+            
+            # take the raw uncentered X for the fix pc sign calculation 
+            # should be genes x samples
+            # TODO: include outliers, as they're not considered in the raw subsetting. potential shape mismatch of subset and raw_subset
+            subsetlist_no_out = [x for i, x in enumerate(self.subsetlist) if i not in self.outliers]
+            self.raw_X_subset = self.adata.raw[:, subsetlist_no_out].X.T.copy()
+            
             # parallelization
             if parallel:
                 self.randomset_parallel(self.adata, self.subsetlist, 
@@ -1268,12 +1333,10 @@ class ROMA:
             #print('self.nulll1 :', self.nulll1)
             # Store the results for this gene set in a new instance of GeneSetResult
             
-            # take the raw uncentered X for the fix pc sign calculation 
-
-            #raw_X_subset = adata_raw[:, self.subsetlist].X.T
-
+           
+            
             gene_set_result = self.GeneSetResult(self.subset, self.subsetlist, self.outliers, self.nullgenesetsize, 
-                                                 self.svd, self.X ,#instead of raw_X_subset
+                                                 self.svd, self.X , self.raw_X_subset, #instead of raw_X_subset
                                                  self.nulll1, self.null_median_exp, self.null_projections)
 
             gene_set_result.custom_name = f"GeneSetResult {gene_set_name}"
