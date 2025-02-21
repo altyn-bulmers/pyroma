@@ -15,7 +15,13 @@ class ROMA:
     #TODO: initialize pl.adata with roma.adata
     pl = pl()
     
-    def __init__(self):
+    def __init__(self, computation_mode="bulk"):
+        """
+        Parameters:
+          computation_mode: str, "bulk" (CPU/Sklearn-based computations)
+                            or "sc" (for single-cell data, using GPU via JAX).
+        """
+        self.computation_mode = computation_mode  # "bulk" or "sc"
         self.adata = None
         self.gmt = None
         self.genesets = {}
@@ -34,7 +40,7 @@ class ROMA:
         self.null_distributions = {}
         manager = multiprocessing.Manager()
         self.parallel_results = manager.dict()
-        self.custom_name = color.BOLD + color.GREEN + 'scROMA' + color.END
+        self.custom_name = color.BOLD + color.GREEN + ('scROMA' if self.computation_mode == 'sc' else 'pyROMA') + color.END
         self.q_L1_threshold=0.05 
         self.q_Med_Exp_threshold=0.05
         # params for fix_pc_sign
@@ -44,7 +50,7 @@ class ROMA:
         self.def_wei = 1  # Default weight for missing weights
         self.cor_method = 'pearson'  # Correlation method
 
-        # New attributes for gene signs and extreme percentage
+        # Attributes for gene signs and extreme percentage
         self.gene_signs = {}  # Dictionary to store gene signs per gene set
         self.extreme_percent = 0.1  # Hyperparameter for extreme weights percentage
 
@@ -182,12 +188,14 @@ class ROMA:
         #row_means = np.mean(matrix, axis=1, keepdims=True)
         #X = matrix - row_means
         #X = self.double_mean_center_matrix(matrix).T
+
         X = np.asarray(subset_adata.X.T) 
         # Compute the SVD of X without the outliers
         svd = TruncatedSVD(n_components=2, algorithm=algorithm)#, n_oversamples=2) #algorithm='arpack')
         svd.fit(X)
         #svd.explained_variance_ratio_ = (s ** 2) / (X.shape[0] - 1)
         if not for_randomset:
+            #print(svd.singular_values_)
             self.svd = svd
             self.X = X
         return svd, X
@@ -248,8 +256,145 @@ class ROMA:
             self.X = X
         return svd, X
 
+    def truncated_robustGPUSVD(self, adata, subsetlist, outliers, for_randomset=False):
+        from scipy.sparse import issparse
+        import jax.numpy as jnp
+
+        # Select the subset of genes: if not for_randomset, remove outliers.
+        if for_randomset:
+            subset = [x for i, x in enumerate(subsetlist)]
+        else:
+            subset = [x for i, x in enumerate(subsetlist) if i not in outliers]
+        subset_adata = adata[:, subset].copy()
+        
+        # Convert the expression matrix to a JAX array.
+        # Note: We assume that the expression matrix is stored such that rows are genes and columns are samples.
+        # Therefore, we transpose to have shape (n_samples, n_genes).
+        if issparse(subset_adata.X):
+            subset_adata.X = subset_adata.X.todense()
+
+        X = jnp.array(subset_adata.X.T, dtype=jnp.float32)
+
+        # Define a helper function to compute a truncated SVD for the first k components using power iteration.
+        def truncated_svd(X, k=2, num_iters=200, eps=1e-6):
+            n, m = X.shape
+            U_list = []
+            s_list = []
+            V_list = []
+            X_deflated = X
+            for i in range(k):
+                # Initialize a random vector (here simply ones) of size m.
+                v = jnp.ones((m,))
+                v = v / (jnp.linalg.norm(v) + eps)
+                # Power iteration loop.
+                for _ in range(num_iters):
+                    u = X_deflated @ v
+                    u = u / (jnp.linalg.norm(u) + eps)
+                    v = X_deflated.T @ u
+                    v = v / (jnp.linalg.norm(v) + eps)
+                # Compute the corresponding singular value.
+                sigma = jnp.dot(u, X_deflated @ v)
+                U_list.append(u)
+                s_list.append(sigma)
+                V_list.append(v)
+                # Deflate the matrix to remove the contribution of the computed singular triplet.
+                X_deflated = X_deflated - sigma * jnp.outer(u, v)
+            U = jnp.stack(U_list, axis=1)   # shape: (n, k)
+            s = jnp.stack(s_list, axis=0)     # shape: (k,)
+            Vh = jnp.stack(V_list, axis=0)    # shape: (k, m)
+            return U, s, Vh
+
+        # Compute the truncated SVD (first 2 components).
+        U, s, Vh = truncated_svd(X, k=2, num_iters=100)
+        # The total variance equals the squared Frobenius norm of X.
+        total_variance = jnp.sum(X ** 2)
+        explained_variance_ratio_ = (s ** 2) / total_variance
+
+        # Create a lightweight object to mimic the scikit-learn SVD output.
+        class GPUSVD:
+            def __init__(self, components_, explained_variance_ratio_):
+                self.components_ = components_
+                self.explained_variance_ratio_ = explained_variance_ratio_
+        
+        svd = GPUSVD(components_=Vh, explained_variance_ratio_=explained_variance_ratio_)
+        if not for_randomset:
+            self.svd = svd
+            self.X = X
+        return svd, X
 
     
+
+    def robustGPUSVD(self, adata, subsetlist, outliers, for_randomset=False):
+        """
+        Compute the SVD on GPU using jax.scipy.linalg.svd with float64 precision.
+        This method returns the first 2 components, ensuring consistency with the CPU version.
+        """
+        from scipy.sparse import issparse
+        import jax.numpy as jnp
+        import jax.scipy.linalg as jsp_linalg
+        import numpy as np
+
+        # Select the subset of genes: if not for_randomset, remove outliers.
+        if for_randomset:
+            subset = subsetlist
+        else:
+            subset = [x for i, x in enumerate(subsetlist) if i not in outliers]
+        subset_adata = adata[:, subset]
+
+        # Convert the expression matrix to a dense NumPy array with float64 precision.
+        if issparse(subset_adata.X):
+            denseX = subset_adata.X.toarray()
+        else:
+            denseX = np.asarray(subset_adata.X)
+        denseX = np.asarray(denseX, dtype=np.float64)
+
+        # We assume that the matrix is stored such that rows are genes and columns are samples,
+        # so transpose it to have shape (n_samples, n_genes).
+        X = jnp.array(denseX.T, dtype=jnp.float64)
+        n_samples = X.shape[0]
+        
+        print("shape of X: ", X.shape)
+        # Use the robust full SVD from jax.scipy.linalg.svd.
+        U, s, Vh = jsp_linalg.svd(X, full_matrices=True)
+        # Select only the first 2 components.
+        U2 = U[:, :2]    # shape: (n_samples, 2)
+        s2 = s[:2]       # shape: (2,)
+        Vh2 = Vh[:2, :]  # Vh2 has shape (2, n_genes)
+        #s = jnp.sort(s, descending=True) #not necessary
+
+        # Compute total variance and explained variance ratio for the first component.
+        #variances = s**2 / (X.shape[0]-1)
+        #explained_variances = variances / np.sum(variances)
+        #total_variance = jnp.sum(s ** 2)
+        #explained_variance_ratio = (s[0] ** 2 ) / total_variance
+        #explained_variance = (s2[0] ** 2) / (n_samples - 1)
+        #total_variance = jnp.sum(jnp.var(X, axis=0, ddof=1))
+        #L1_ratio = explained_variance / total_variance
+        #explained_variance_ratio = L1_ratio
+        
+        # Compute the transformed data as X_transformed = X dot Vh2.T.
+        X_transformed = X @ Vh2.T   # shape: (n_samples, 2)
+        # Calculate explained variance per component.
+        exp_var = jnp.var(X_transformed, axis=0)
+        # Compute full variance from X.
+        full_var = jnp.var(X, axis=0).sum()
+        explained_variance_ratio = exp_var / full_var
+        
+        #print("exp var ratio: ", explained_variance_ratio)
+        #print("singular values: ", s2)
+
+        # Create a lightweight SVD object to mimic scikit-learn’s SVD output.
+        class GPUSVD:
+            def __init__(self, components_, explained_variance_ratio_):
+                self.components_ = components_
+                self.explained_variance_ratio_ = explained_variance_ratio_
+        svd = GPUSVD(components_=Vh2, explained_variance_ratio_=explained_variance_ratio)
+        
+        if not for_randomset:
+            self.svd = svd
+            self.X = X
+        return svd, X
+
 
     def fix_pc_sign(self, GeneScore, SampleScore, Wei=None, Mode='none', DefWei=1,
                     Thr=None, Grouping=None, ExpMat=None, CorMethod="pearson",
@@ -277,6 +422,7 @@ class ROMA:
         #import numpy as np
         #import pandas as pd
         from scipy.stats import pearsonr, spearmanr, kendalltau
+        from scipy.sparse import issparse
         import os
         
         output_dir = '/home/az/Projects/01_Curie/06.1_pyROMA_Sofia_results/pyroma_debug/'
@@ -652,7 +798,11 @@ class ROMA:
                     # In R code: ExpMat <- scale(apply(ExpMat, 1, median), center=TRUE, scale=FALSE)
                     # apply(ExpMat,1,median) gives a median per gene: a vector of length=ngenes
                     # scale(...) center=TRUE means subtract mean
-                    median_per_gene = ExpMat.median(axis=1).values
+                    #median_per_gene = ExpMat.median(axis=1).values
+                    if issparse(ExpMat):
+                        median_per_gene = ExpMat.median(axis=1).A.flatten()
+                    else:
+                        median_per_gene = ExpMat.median(axis=1).values
                     centered_median = median_per_gene - np.mean(median_per_gene)
                     val = np.sum(GeneScore[ToUse] * Wei[ToUse] * centered_median[ToUse])
                     if val > 0:
@@ -665,8 +815,13 @@ class ROMA:
 
             # For nbUsed >= 2:
             # ExpMat[ToUse, ] means subset genes
-            
-            subset_mat = ExpMat[ToUse, :]
+            if self.computation_mode == 'bulk':
+                subset_mat = ExpMat[ToUse, :]
+            if self.computation_mode == 'sc':
+                if issparse(ExpMat):
+                    subset_mat = ExpMat[ToUse, :].toarray()
+                else:
+                    subset_mat = np.atleast_2d(ExpMat[ToUse, :])
 
             row_medians = np.median(subset_mat, axis=1)
             centered_medians = np.array(row_medians - np.mean(row_medians))
@@ -777,7 +932,7 @@ class ROMA:
         )
         
         return correct_sign
-    
+        
             
     def compute_median_exp(self, svd_, X, raw_X_subset, gene_set_name=None):
         """
@@ -826,7 +981,17 @@ class ROMA:
         median_exp, null_projections_1, null_projections_2 = self.compute_median_exp(svd_, X, self.raw_X_subset)
 
         return l1, median_exp, null_projections_1, null_projections_2
-        
+
+    def process_iteration_gpu(self, sequence, idx, iteration):
+        subset = np.random.choice(sequence, self.nullgenesetsize, replace=False)
+        gene_subset = np.array([x for i, x in enumerate(idx) if i in subset])
+        outliers = self.loocv(self.adata[:, [x for x in gene_subset]], for_randomset=True)
+        svd_, X = self.robustGPUSVD(self.adata, gene_subset, outliers, for_randomset=True)
+        l1 = svd_.explained_variance_ratio_
+        subsetlist = [x for i, x in enumerate(gene_subset) if i not in outliers]
+        median_exp, null_projections_1, null_projections_2 = self.compute_median_exp(svd_, X, self.raw_X_subset)
+        return l1, median_exp, null_projections_1, null_projections_2
+
     ### Claude from rROMA
     def randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', 
                         incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
@@ -865,13 +1030,19 @@ class ROMA:
         # Setup parallel processing
         sequence = np.arange(self.adata.shape[1])
         idx = self.adata.var.index.to_numpy()
-
-        # Run parallel iterations
-        results = Parallel(n_jobs=-1, prefer=prefer_type)(
-            delayed(self.process_iteration)(sequence, idx, iteration, incremental, 
-                                        partial_fit, algorithm) 
-            for iteration in range(iters)
-        )
+        
+        # Choose which process_iteration to use based on computation_mode.
+        if self.computation_mode == "sc":
+            results = Parallel(n_jobs=-1, prefer=prefer_type)(
+                delayed(self.process_iteration_gpu)(sequence, idx, iteration) for iteration in range(iters)
+            )
+        else:
+            # Run parallel iterations
+            results = Parallel(n_jobs=-1, prefer=prefer_type)(
+                delayed(self.process_iteration)(sequence, idx, iteration, incremental, 
+                                            partial_fit, algorithm) 
+                for iteration in range(iters)
+            )
 
         # Unpack results
         nulll1, null_median_exp, null_projections_1, null_projections_2 = zip(*results)
@@ -898,62 +1069,8 @@ class ROMA:
             minutes, seconds = divmod(elapsed, 60)
             print(f"Running time: {int(minutes):02}:{seconds:05.2f}")
         
-        def original_randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
-            """
-            Calculates scores for the random gene set of the same size and returns null distributions of scores.
-            """
-            from joblib import Parallel, delayed
-            import time
-
-            # Start timer
-            start = time.time()
-
-            # Calculate null gene set size by finding the closest size 
-            # from filtered geneset sizes by approx_sample in the log scale 
-            
-            candidate_nullgeneset_size = self.nullgenesetsize
-            #len(self.subsetlist)
-
-            # If the null distribution with this null geneset size was caclulated, pass to the next pathway
-            if candidate_nullgeneset_size in self.null_distributions:
-                self.nulll1, self.null_median_exp = self.null_distributions[candidate_nullgeneset_size]
-                print('Took null distribution from previous calculation')
-            else: 
-                # Define the number of iterationsself.null_geneset_sizes
-                num_iterations = iters
-                sequence = np.arange(self.adata.shape[1])
-                idx = self.adata.var.index.to_numpy()
-
-                # Use parallel processing to process iterations
-                results = Parallel(n_jobs=-1, prefer=prefer_type)(
-                    delayed(self.process_iteration)(sequence, idx, iteration, incremental, partial_fit, algorithm) for iteration in range(num_iterations)
-                )
-
-                # Unzip the results
-                nulll1, null_median_exp, null_projections_1, null_projections_2 = list(zip(*results))
-                nulll1_array = np.array(nulll1)
-                null_median_exp = np.array(null_median_exp)
-                null_projections_1 = np.array(null_projections_1)
-                null_projections_2 = np.array(null_projections_2)
-                null_projections = np.stack((null_projections_1, null_projections_2), axis=1)
-                # update the dictiorary with null distributions 
-                self.null_distributions[candidate_nullgeneset_size] = [np.copy(nulll1_array), np.copy(null_median_exp)]
-                # Store results in the object
-                self.nulll1 = np.copy(nulll1_array)
-                self.null_median_exp = np.copy(null_median_exp)
-                self.null_projections = np.copy(null_projections)
-
-                # Calculate elapsed time
-                end = time.time()
-                elapsed_time = end - start
-                minutes, seconds = divmod(elapsed_time, 60)
-
-                # Verbose output
-                if verbose:
-                    print(f"Running time (min): {int(minutes):02}:{seconds:05.2f}")
-
-            return
-
+        return
+        
     def wilcoxon_assess_significance(self, results):
         
         ### rROMA like
@@ -1038,13 +1155,20 @@ class ROMA:
         for i, (_, gene_set_result) in enumerate(results.items()):
             #print('PRINTING to fix the ERROR', gene_set_result.nulll1)
             #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
-            null_distribution = gene_set_result.nulll1[:,0]
+            if np.ndim(gene_set_result.nulll1) == 1:
+                null_distribution = gene_set_result.nulll1
+            else:
+                null_distribution = gene_set_result.nulll1[:,0]
             null_median_distribution = gene_set_result.null_median_exp
             print('shape of the null distribution: ', null_distribution.shape)
             print('shape of null med distribution: ', null_median_distribution.shape)
 
             # L1 statistics
-            test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
+            if self.computation_mode == 'sc':
+                test_l1 = np.asarray(gene_set_result.svd.explained_variance_ratio_[0]).item()
+            else:
+                test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
+            #print(type(test_l1))
             #p_value = (np.sum(null_distribution >= test_l1) + 1) / (len(null_distribution) + 1) # original value
             p_value = np.mean(np.array(null_distribution) >= test_l1)
             # changing that to wilcoxon as in rROMA
@@ -1100,54 +1224,6 @@ class ROMA:
             gene_set_result.non_adj_q = qs[i]
         return results
     
-    
-    def old_assess_significance(self, results):
-        
-        # TODO: outputx the non-adjusted p-s and Median exp non-adj p-s well
-        
-        """
-        Computes the empirical p-value based on the null distribution of L1 scores and median expression.
-        Adjust p-values and q-values using the Benjamini-Hochberg procedure.
-        """
-        from scipy.stats import false_discovery_control as benj_hoch
-        
-        #valid_results = {name: result for name, result in results if result is not None}
-        ps = np.zeros(shape=len(results))
-        qs = np.zeros(shape=len(results))
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            #print('PRINTING to fix the ERROR', gene_set_result.nulll1)
-            #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
-            null_distribution = gene_set_result.nulll1[:,0]
-            null_median_distribution = gene_set_result.null_median_exp
-
-            # L1 statistics
-            test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
-            p_value = (np.sum(null_distribution >= test_l1) + 1) / (len(null_distribution) + 1)
-            # otherwise p_value could be calculated with (np.sum(null_distribution >= test_l1)) / (len(null_distribution))
-            ps[i] =  p_value #if p_value <= 1.0 else 1.0
-            gene_set_result.test_l1 = test_l1
-
-            # Median Exp statistic
-            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X)
-            q_value = (np.sum(null_median_distribution >= test_median_exp) + 1) / (len(null_median_distribution) + 1)
-            qs[i] = q_value
-            gene_set_result.test_median_exp = test_median_exp
-            gene_set_result.projections_1 = projections_1
-            gene_set_result.projections_2 = projections_2
-
-        #print('raw p-values', ps)
-        #print('raw q-values', qs)
-        adjusted_ps = benj_hoch(ps)
-        adjusted_qs = benj_hoch(qs)
-        # confirm the same lengths of lists
-        #print('Lengths of ps and adj_ps match and match the adj_qs', len(ps) == len(adjusted_ps), len(adjusted_ps) == len(adjusted_qs) )
-        
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            gene_set_result.p_value = adjusted_ps[i]
-            gene_set_result.non_adj_p = ps[i]
-            gene_set_result.q_value = adjusted_qs[i]
-            gene_set_result.non_adj_q = qs[i]
-        return results
 
     def approx_size(self, flag):
         """
@@ -1241,9 +1317,250 @@ class ROMA:
         df['q L1'] = pd.Series(p_dict)
         df['q Med Exp'] = pd.Series(q_dict)
         return df
-    
-    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=False):        
+
+
+
+
+    def center_sparse(self, X):
+        # checked
+        """
+        Center a sparse matrix X (n_samples x n_features) by:
+        1. Subtracting the row-wise mean (making each row zero-mean).
+        2. Subtracting the column-wise mean (making each column zero-mean).
         
+        Returns a centered sparse matrix.
+        """
+        import numpy as np
+        import scipy.sparse as sp
+        
+        n_samples, n_features = X.shape
+
+        # Compute row means and reshape to column vector (n_samples, 1)
+        row_means = np.array(X.mean(axis=1)).flatten().reshape(-1, 1)
+        # Create a sparse matrix where each row is the row mean replicated n_features times
+        row_mean_matrix = sp.csr_matrix(row_means).dot(sp.csr_matrix(np.ones((1, n_features))))
+        
+        # Subtract row means
+        X_centered = X - row_mean_matrix
+
+        # Convert to CSC for efficient column operations
+        X_centered = X_centered.tocsc()
+
+        # Compute column means and reshape to row vector (1, n_features)
+        col_means = np.array(X_centered.mean(axis=0)).flatten().reshape(1, -1)
+        # Create a sparse matrix where each column is the column mean replicated n_samples times
+        col_mean_matrix = sp.csc_matrix(np.ones((n_samples, 1))).dot(sp.csc_matrix(col_means))
+        
+        # Subtract column means
+        X_centered = X_centered - col_mean_matrix
+
+        return X_centered.tocsr()
+
+    
+
+    def broken_randomset_parallel_gpu(self, key, iters=100):
+        """
+        GPU-parallel computation of null distributions via JAX vectorization.
+        
+        Parameters:
+        key: a JAX PRNGKey.
+        iters: number of iterations.
+        
+        This function assumes that:
+        - self.X is a dense JAX array (e.g. produced by robustGPUSVD) of shape (n_samples, n_features)
+        - self.nullgenesetsize is an integer indicating how many columns (genes) to sample.
+        
+        It vectorizes the following per-iteration operations:
+        1. Randomly sample a subset of gene indices (without replacement) using jax.random.permutation.
+        2. Extract the corresponding submatrix.
+        3. Compute a truncated SVD (here, for the first 2 components) using power iteration.
+        4. Compute the explained variance ratio of the first component.
+        5. Compute the median of the PC1 projections.
+        
+        The function returns (and stores) the null distributions.
+        """
+        import jax
+        import jax.numpy as jnp
+        import jax.scipy.linalg as jsp_linalg
+        #import numpy as np
+        
+        n_samples, n_features = self.adata.X.shape
+        print('n_features', n_features)
+        nullsize = self.nullgenesetsize  # number of genes in the null set
+        
+        def one_iteration(key):
+            # Generate a random permutation over gene indices and take the first 'nullsize' indices.
+            perm = jax.random.permutation(key, n_features)
+            selected = perm[:nullsize]
+            # Extract the subset (n_samples x nullsize).
+            selected_np = np.asarray(selected) 
+            X_subset = self.adata.X[:, selected_np]
+            X_subset = jnp.array(X_subset.toarray()) 
+            #X_subset_jax = jax.numpy.asarray(X_subset.toarray())  
+
+            print('null subset shape:', X_subset.shape)
+            # Compute truncated SVD on X_subset.
+            #U, s, Vh = truncated_svd(X_subset, k=2, num_iters=50)
+            U, s, Vh = jsp_linalg.svd(X_subset, full_matrices=False)
+            # Compute the transformed data as X_transformed = X_subset @ Vh.T
+            X_transformed = X_subset @ Vh.T  # shape: (n_samples, 2)
+            # Compute explained variance for each component.
+            exp_var = jnp.var(X_transformed, axis=0)  # shape: (2,)
+            # Compute full variance of X_subset.
+            full_var = jnp.var(X_subset, axis=0).sum()
+            # L1 explained variance ratio.
+            expl_ratio = exp_var[0] / full_var
+            # For projections, we use the first component loadings.
+            pc1 = Vh[0, :]  # shape: (nullsize,)
+            projections = X_subset @ pc1  # shape: (n_samples,)
+            med_exp = jnp.median(projections)
+            return expl_ratio, med_exp, projections
+
+        # Split the key into 'iters' subkeys.
+        keys = jax.random.split(key, iters)
+        # Vectorize the one_iteration function over the keys.
+        expl_ratios, med_exps, projections_all = jax.vmap(one_iteration)(keys)
+        
+        #print("null explained ratios", expl_ratios)
+
+        # Optionally store these in your object:
+        self.nulll1 = expl_ratios  # Null distribution of explained variance ratios.
+        self.null_median_exp = med_exps
+        self.null_projections = projections_all  # This will be a 2D array: (iters, n_samples)
+        
+        return expl_ratios, med_exps, projections_all
+
+    def randomset_parallel_gpu(self, key, iters=100):
+        """
+        GPU-parallel computation of null distributions via batching.
+        
+        Instead of calling jax.vmap directly on a function that performs sparse indexing
+        (which causes tracer conversion errors), we first generate concrete random subsets
+        and extract the corresponding dense submatrices from self.adata.X.
+        
+        Then we stack these submatrices (shape: (iters, n_samples, nullsize)) and use jax.vmap
+        to compute, for each, the explained variance ratio (L1 score) and median of PC1 projections,
+        computed in the same way as in scikit-learn's TruncatedSVD.
+        
+        Assumes:
+        - self.X is NOT used here; instead, we use self.adata.X (a scipy sparse matrix)
+        - self.nullgenesetsize is an integer (nullsize)
+        """
+        import jax
+        import jax.numpy as jnp
+        import jax.scipy.linalg as jsp_linalg
+        import numpy as np
+
+        n_samples, n_features = self.adata.X.shape  # self.adata.X is sparse (genes x samples)
+        # Note: In our SVD routines we assume X is (n_samples, n_genes) so we will transpose later.
+        # Here, self.adata.X.shape is (n_genes, n_samples). 
+        # We therefore define:
+        n_genes = n_features  # if self.adata.X.shape is (n_genes, n_samples)
+        nullsize = self.nullgenesetsize  # number of genes (columns in the transposed X) to sample
+        # TODO: to compute on parallel cores
+        # Step 1: Generate concrete (non-traced) random subsets of gene indices.
+        # We work in the gene domain (indices from 0 to n_genes-1).
+        keys = jax.random.split(key, iters)
+        selected_indices = []
+        for k in keys:
+            # Convert the key to a concrete integer seed:
+            seed = int(jax.device_get(k)[0])
+            # Generate a random permutation using numpy (with the same seed)
+            rng = np.random.RandomState(seed)
+            perm = rng.permutation(n_genes)
+            selected = perm[:nullsize]  # concrete numpy array of indices
+            selected_indices.append(selected)
+        selected_indices = np.stack(selected_indices, axis=0)  # shape: (iters, nullsize)
+
+        # Step 2: For each set of indices, extract the corresponding columns from self.adata.X,
+        # then transpose so that the resulting dense submatrix has shape (n_samples, nullsize).
+        # Since self.adata.X is sparse (shape: (n_genes, n_samples)), we index rows here.
+        # (Remember: in the full pipeline we use X = (n_samples, n_genes), so here we extract and then transpose.)
+        X_subsets = []
+        for inds in selected_indices:
+            # Extract rows corresponding to the selected gene indices.
+            # self.adata.X is sparse, so we use .toarray() on the resulting submatrix.
+            X_subset = self.adata.X[inds, :].toarray()  # shape: (nullsize, n_samples)
+            X_subsets.append(X_subset.T)  # transpose to shape: (n_samples, nullsize)
+        X_subsets = np.stack(X_subsets, axis=0)  # shape: (iters, n_samples, nullsize)
+
+        # Convert the batched dense submatrices to a JAX array with float64 precision.
+        X_subsets = jnp.array(X_subsets, dtype=jnp.float64)
+
+        # Step 3: Define a function that computes the explained variance ratio in the same way as TruncatedSVD.
+        def compute_metrics(X_subset):
+            # X_subset is of shape (n_samples, nullsize)
+            # Compute full SVD on the subset.
+            U, s, Vh = jsp_linalg.svd(X_subset, full_matrices=False)
+            # Compute the transformed data: X_transformed = X_subset @ Vh.T  (shape: (n_samples, 2))
+            X_transformed = X_subset @ Vh.T
+            # Compute explained variance for each component as variance along axis 0.
+            exp_var = jnp.var(X_transformed, axis=0)  # shape: (k,), here k= nullsize? But we only need first 2.
+            # In practice, we only computed full SVD; we now consider only the first component.
+            # Compute full variance of X_subset: sum of variance across features.
+            full_var = jnp.var(X_subset, axis=0).sum()
+            # Explained variance ratio (L1) is the variance of the first component divided by full variance.
+            expl_ratio = exp_var[0] / full_var
+            # For projections, we use the first component loadings from Vh.
+            pc1 = Vh[0, :]  # shape: (nullsize,)
+            projections = X_subset @ pc1  # shape: (n_samples,)
+            med_exp = jnp.median(projections)
+            return expl_ratio, med_exp, projections
+
+        # Step 4: Vectorize the metric computation over the first axis (each batch element).
+        expl_ratios, med_exps, projections_all = jax.vmap(compute_metrics)(X_subsets)
+
+        # Optionally store these in your object:
+        self.nulll1 = expl_ratios  # shape: (iters,)
+        self.null_median_exp = med_exps  # shape: (iters,)
+        self.null_projections = projections_all  # shape: (iters, n_samples)
+
+        return expl_ratios, med_exps, projections_all
+
+
+    def batched_randomset_parallel_gpu(self, key, total_iters=100, batch_size=100):
+        """
+        Run the GPU parallel randomset computation in batches.
+        
+        Parameters:
+        key: A JAX PRNGKey.
+        total_iters: Total number of iterations desired.
+        batch_size: Number of iterations to run in each batch.
+        
+        Returns:
+        Combined null distribution arrays.
+        """
+
+        import jax
+        import numpy as np
+        import gc
+
+        num_batches = total_iters // batch_size
+        all_expl_ratios = []
+        all_med_exps = []
+        all_projections = []
+        current_key = key
+        for i in range(num_batches):
+            # Split the key for this batch.
+            current_key, subkey = jax.random.split(current_key)
+            # Run a batch of iterations.
+            expl_ratios, med_exps, projections = self.randomset_parallel_gpu(subkey, iters=batch_size)
+            # Convert results to numpy arrays and store.
+            all_expl_ratios.append(np.array(expl_ratios))
+            all_med_exps.append(np.array(med_exps))
+            all_projections.append(np.array(projections))
+            # Clear JAX caches and run garbage collection to free GPU memory.
+            jax.clear_caches()
+            gc.collect()
+            print(f"Completed batch {i+1}/{num_batches}")
+        # Concatenate the batch results.
+        all_expl_ratios = np.concatenate(all_expl_ratios)
+        all_med_exps = np.concatenate(all_med_exps)
+        all_projections = np.concatenate(all_projections, axis=0)
+        return all_expl_ratios, all_med_exps, all_projections
+
+
+    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=False):
         #pl.adata = self.adata
         """
         Computes ROMA
@@ -1252,6 +1569,28 @@ class ROMA:
                     from 0 to 100, what is the minimum distance in the n of genes between sizes of the genesets.  
         
         """
+        from scipy import sparse
+        limit_preallocation = False
+        # Handle sparse adata.X for efficiency:
+        if sparse.issparse(self.adata.X):
+            if self.computation_mode == "sc":
+                print("adata.X is sparse")#; converting to dense for GPU computation.")
+                limit_preallocation = True
+            else:
+                print("adata.X is sparse, convert to dense for bulk computation")
+                self.adata.X = self.adata.X.toarray()
+                #self.adata.X = sparse.csr_matrix(self.adata.X)
+        else:
+            if self.computation_mode == "sc":
+                limit_preallocation = True
+                print("adata.X is not sparse, converting it")
+                self.adata.X = sparse.csr_matrix(self.adata.X)
+        
+        # pre allocation
+        if limit_preallocation:
+            import os
+            os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION'] = '0.85'
+            os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = 'false'
 
         results = {}
         
@@ -1263,15 +1602,19 @@ class ROMA:
         X = self.adata.X.T 
         #X_raw = X.copy()
         
-        if double_mean_centering:
-            # centering across samples and genes
-            X_centered = self.double_mean_center_matrix(X)
-
+        # centering
+        if self.computation_mode == "sc":
+            X_centered = self.center_sparse(X)
         else:
-            # centering over samples, genes have 0 mean
-            # replicates the behavior in R
-            X_centered = X - np.mean(X, axis=1, keepdims=True)
-            X_centered = X_centered - np.mean(X_centered, axis=0, keepdims=True)
+            if double_mean_centering:
+                # centering across samples and genes
+                X_centered = self.double_mean_center_matrix(X)
+
+            else:
+                # centering over samples, genes have 0 mean
+                # replicates the behavior in R
+                X_centered = X - np.mean(X, axis=1, keepdims=True)
+                X_centered = X_centered - np.mean(X_centered, axis=0, keepdims=True)
 
         self.adata.X = X_centered.T 
         
@@ -1290,6 +1633,8 @@ class ROMA:
         # TODO: handle different selection of genesets 
         if selected_gene_sets == 'all':
             selected_gene_sets = self.genesets.keys()
+        else:
+            selected_gene_sets = list(set(selected_gene_sets) & set(self.genesets.keys()))
 
         unprocessed_genesets = []
 
@@ -1304,36 +1649,44 @@ class ROMA:
             if len(self.subsetlist) < self.min_n_genes:
                 unprocessed_genesets.append(gene_set_name)
                 continue
+            # TODO: loocv should be also computed on GPU in "sc" compute mode
             if loocv_on:
                 self.loocv(self.subset)
             
             self.approx_size(flag)
             flag = False
-
-            if incremental:
-                self.robustPCA(self.adata, self.subsetlist, self.outliers)
-                #self.robustIncrementalPCA(self.adata, self.subsetlist, self.outliers)
-                #self.robustKernelPCA(self.adata, self.subsetlist, self.outliers)
-            else:
-                self.robustTruncatedSVD(self.adata, self.subsetlist, self.outliers, algorithm=algorithm)
             
+            # SVD
+            if self.computation_mode == "sc":
+                self.robustGPUSVD(self.adata, self.subsetlist, self.outliers)
+            else:
+                if incremental:
+                    self.robustIncrementalPCA(self.adata, self.subsetlist, self.outliers)
+                    #self.robustKernelPCA(self.adata, self.subsetlist, self.outliers)
+                else:
+                    self.robustTruncatedSVD(self.adata, self.subsetlist, self.outliers, algorithm=algorithm)
+                
             # take the raw uncentered X for the fix pc sign calculation 
             # should be genes x samples
             # TODO: include outliers, as they're not considered in the raw subsetting. potential shape mismatch of subset and raw_subset
             subsetlist_no_out = [x for i, x in enumerate(self.subsetlist) if i not in self.outliers]
             self.raw_X_subset = self.adata.raw[:, subsetlist_no_out].X.T.copy()
-            
+
             # parallelization
             if parallel:
-                self.randomset_parallel(self.adata, self.subsetlist, 
+                if self.computation_mode == 'bulk':
+                    self.randomset_parallel(self.adata, self.subsetlist, 
                                         self.outliers, prefer_type='processes', incremental=incremental, iters=iters, partial_fit=partial_fit, 
                                         algorithm=algorithm)
-
+                elif self.computation_mode == 'sc':
+                    # Run the GPU-based version.
+                    import jax
+                    key = jax.random.PRNGKey(1)
+                    #self.randomset_parallel_gpu(key, iters=iters)
+                    self.nulll1, self.null_median_exp, self.null_projections = self.batched_randomset_parallel_gpu(key, total_iters=iters, batch_size=100)
             #print('self.nullgenesetsize', self.nullgenesetsize)
             #print('self.nulll1 :', self.nulll1)
             # Store the results for this gene set in a new instance of GeneSetResult
-            
-           
             
             gene_set_result = self.GeneSetResult(self.subset, self.subsetlist, self.outliers, self.nullgenesetsize, 
                                                  self.svd, self.X , self.raw_X_subset, #instead of raw_X_subset
@@ -1342,7 +1695,6 @@ class ROMA:
             gene_set_result.custom_name = f"GeneSetResult {gene_set_name}"
             # Store the instance of GeneSetResult in the dictionary using gene set name as the key
             results[gene_set_name] = gene_set_result
-            #print('null geneset size:', self.nullgenesetsize)
 
         #print(' RESULTS:', results)
         # calculate p_value adjusted for multiple-hypotheses testing
