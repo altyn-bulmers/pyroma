@@ -30,6 +30,12 @@ class ROMA:
         self.X = None
         self.raw_X_subset = None
         self.nulll1 = []
+        self.test_l1 = None
+        self.p_value = None
+        self.test_median_exp = None
+        self.med_exp_p_value = None
+        self.projections_1 = None
+        self.projections_2 = None
         self.results = {}
         self.null_distributions = {}
         manager = multiprocessing.Manager()
@@ -43,7 +49,7 @@ class ROMA:
         self.pc_sign_thr = 0.90  # Threshold for extreme weights
         self.def_wei = 1  # Default weight for missing weights
         self.cor_method = 'pearson'  # Correlation method
-
+        self.correct_pc_sign = 1    # Store after orient_pc to keep track of orientation
         # New attributes for gene signs and extreme percentage
         self.gene_signs = {}  # Dictionary to store gene signs per gene set
         self.extreme_percent = 0.1  # Hyperparameter for extreme weights percentage
@@ -625,7 +631,7 @@ class ROMA:
 
         # MODE: 'UseMeanExpressionAllWeights'
         if Mode == 'UseMeanExpressionAllWeights':
-            print_msg(f"Missing gene weights will be replaced by {DefWei}")
+            #print_msg(f"Missing gene weights will be replaced by {DefWei}")
             Wei = np.where(np.isnan(Wei), DefWei, Wei)
             Mode = 'UseMeanExpressionKnownWeights'
 
@@ -751,6 +757,7 @@ class ROMA:
         """
         Orient PC1 according to the methods described.
         """
+        import scipy.sparse as sp
         # Get gene scores (loadings) and sample scores (projections)
         sample_score = pc1
         gene_score = X @ pc1
@@ -759,8 +766,11 @@ class ROMA:
         wei = self.gene_weights.get(gene_set_name, None)
         #print("wei: ", wei)
         # exp_mat is data (genes x samples)
-        print(f"GeneScore shape: {gene_score.shape}")
-        print(f"ExpMat shape: {raw_X_subset.shape}")
+        # TODO: actually test if raw_X_subset is numpy.ndarray and not sparse matrix e.g.
+        #print(f"GeneScore shape: {gene_score.shape}")
+        #print(f"ExpMat shape: {raw_X_subset.shape}")
+        if isinstance(raw_X_subset, sp.spmatrix):
+            raw_X_subset = raw_X_subset.toarray() #np.float64
         #print("Outliers: ", self.outliers)
 
         correct_sign = self.fix_pc_sign(
@@ -776,6 +786,7 @@ class ROMA:
             gene_set_name=gene_set_name
         )
         
+
         return correct_sign
     
             
@@ -792,6 +803,7 @@ class ROMA:
         #raw_median_exp = np.median(X @ pc1)
         # Orient PC1
         correct_sign = self.orient_pc1(pc1, X, raw_X_subset, gene_set_name=gene_set_name)
+        self.correct_pc_sign = correct_sign
         pc1 = correct_sign * pc1
         
         projections_1 = X @ pc1 # the scores that each gene have in the sample space
@@ -808,6 +820,7 @@ class ROMA:
         """
         Iteration step for the randomset calculation
         """
+        import numpy as np
         ### ?
         #np.random.seed(42) # this is suggested to add
         
@@ -827,7 +840,7 @@ class ROMA:
 
         return l1, median_exp, null_projections_1, null_projections_2
         
-    ### Claude from rROMA
+    ### C from rROMA
     def randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', 
                         incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
         """
@@ -1020,7 +1033,67 @@ class ROMA:
 
         return results
 
+    def get_raw_p_values(self, gene_set_name=None):
+        
+        """
+        Extract raw p values from null distribution
+        """
+
+        null_distribution = self.nulll1[:,0]
+        null_median_distribution = self.null_median_exp
+
+        # L1 statistics
+        test_l1 = self.svd.explained_variance_ratio_[0]
+        p_value = np.mean(np.array(null_distribution) >= test_l1)
+
+        self.test_1 = test_l1
+        self.p_value = p_value
+
+        # Median Exp statistic
+        test_median_exp, projections_1, projections_2 = self.compute_median_exp(self.svd, self.X, self.raw_X_subset, gene_set_name)
+        med_exp_p_value = (np.sum(np.abs(null_median_distribution) >= np.abs(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
+
+        self.test_median_exp = test_median_exp
+        self.med_exp_p_value = med_exp_p_value
+        self.projections_1 = projections_1 # are already w corrected sign
+        self.projections_2 = projections_2
+
+        # instead of del 
+        self.nulll1 = None; self.null_median_exp = None; self.raw_X_subset = None
+
+        return
+
+    
     def assess_significance(self, results):
+        
+        # TODO: incorporate an option to compute p-values via wilcoxon 
+        """
+        Computes the empirical p-value based on the null distribution of L1 scores and median expression.
+        Adjust p-values and q-values using the Benjamini-Hochberg procedure.
+        """
+        from scipy.stats import false_discovery_control as benj_hoch
+        from statsmodels.stats.multitest import multipletests
+        import numpy as np
+        from scipy.stats import wilcoxon
+
+        ps = np.zeros(shape=len(results))
+        med_ps = np.zeros(shape=len(results))
+        # loop to collect p-values and med_p-values
+        for i, (_, gene_set_result) in enumerate(results.items()):
+            ps[i] =  gene_set_result.non_adj_p
+            med_ps[i] = gene_set_result.non_adj_med_exp_p
+
+        # Adjusted p-values
+        qs = benj_hoch(ps)
+        med_exp_qs = benj_hoch(med_ps)
+        
+        for i, (_, gene_set_result) in enumerate(results.items()):
+            gene_set_result.q_value = qs[i]
+            gene_set_result.med_exp_q_value = med_exp_qs[i]
+
+        return results
+
+    def old_assess_significance(self, results):
        # TODO: output the median of null_L1 distribution
        # TODO: incorporate an option to compute p-values via wilcoxon 
         """
@@ -1040,8 +1113,8 @@ class ROMA:
             #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
             null_distribution = gene_set_result.nulll1[:,0]
             null_median_distribution = gene_set_result.null_median_exp
-            print('shape of the null distribution: ', null_distribution.shape)
-            print('shape of null med distribution: ', null_median_distribution.shape)
+            #print('shape of the null distribution: ', null_distribution.shape)
+            #print('shape of null med distribution: ', null_median_distribution.shape)
 
             # L1 statistics
             test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
@@ -1101,7 +1174,7 @@ class ROMA:
         return results
     
     
-    def old_assess_significance(self, results):
+    def old_old_assess_significance(self, results):
         
         # TODO: outputx the non-adjusted p-s and Median exp non-adj p-s well
         
@@ -1175,23 +1248,23 @@ class ROMA:
         return
     
     class GeneSetResult:
-        def __init__(self, subset, subsetlist, outliers, nullgenesetsize, svd, X, raw_X_subset, nulll1, null_median_exp, null_projections):
+        def __init__(self, subset, subsetlist, outliers, nullgenesetsize, svd ):
             self.subset = subset
             self.subsetlist = subsetlist
             self.outliers = outliers
             self.nullgenesetsize = nullgenesetsize
             self.svd = svd
-            self.X = X
-            self.raw_X_subset = raw_X_subset
+            self.X = None
+            self.raw_X_subset = None
             self.projections_1 = None
             self.projections_2 = None
-            self.nulll1 = nulll1
-            self.null_median_exp = null_median_exp
-            self.null_projections = null_projections
-            self.p_value = None
+            self.nulll1 = None
+            self.null_median_exp = None
+            self.null_projections = None
             self.q_value = None
+            self.med_exp_q_value = None
             self.non_adj_p = None
-            self.non_adj_q = None
+            self.non_adj_med_exp_p = None
             self.test_l1 = None
             self.test_median_exp = None
         
@@ -1219,27 +1292,27 @@ class ROMA:
         
         import pandas as pd
 
-        p_dict = {}
+        q_dict = {} # adj_l1_p_values
         l1_dict = {}
-        q_dict = {}
+        q_med_exp_dict = {}
         median_exp_dict = {}
         non_adj_L1_p_values = {}
         non_adj_Med_Exp_p_values = {}
         for k, v in assessed_results.items():
             l1_dict[k] = v.test_l1
-            p_dict[k] = v.p_value
-            median_exp_dict[k] = v.test_median_exp
             q_dict[k] = v.q_value
+            median_exp_dict[k] = v.test_median_exp
+            q_med_exp_dict[k] = v.med_exp_q_value
             non_adj_L1_p_values[k] = v.non_adj_p
-            non_adj_Med_Exp_p_values[k] = v.non_adj_q
+            non_adj_Med_Exp_p_values[k] = v.non_adj_med_exp_p
 
         df = pd.DataFrame() 
         df['L1'] = pd.Series(l1_dict) 
         df['ppv L1'] = pd.Series(non_adj_L1_p_values)
         df['Median Exp'] = pd.Series(median_exp_dict)
         df['ppv Med Exp'] = pd.Series(non_adj_Med_Exp_p_values)
-        df['q L1'] = pd.Series(p_dict)
-        df['q Med Exp'] = pd.Series(q_dict)
+        df['q L1'] = pd.Series(q_dict)
+        df['q Med Exp'] = pd.Series(q_med_exp_dict)
         return df
     
     def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=False):        
@@ -1263,6 +1336,10 @@ class ROMA:
         X = self.adata.X.T 
         #X_raw = X.copy()
         
+        # TODO: test for various types.
+        if not isinstance(X, np.ndarray):
+            X = X.toarray() 
+
         if double_mean_centering:
             # centering across samples and genes
             X_centered = self.double_mean_center_matrix(X)
@@ -1329,17 +1406,23 @@ class ROMA:
                                         self.outliers, prefer_type='processes', incremental=incremental, iters=iters, partial_fit=partial_fit, 
                                         algorithm=algorithm)
 
-            #print('self.nullgenesetsize', self.nullgenesetsize)
-            #print('self.nulll1 :', self.nulll1)
             # Store the results for this gene set in a new instance of GeneSetResult
             
-           
+            ### here we can calcualte the raw p_values of L1s and Med_Exps
+            self.get_raw_p_values(gene_set_name)
             
+
             gene_set_result = self.GeneSetResult(self.subset, self.subsetlist, self.outliers, self.nullgenesetsize, 
-                                                 self.svd, self.X , self.raw_X_subset, #instead of raw_X_subset
-                                                 self.nulll1, self.null_median_exp, self.null_projections)
+                                                 self.svd)
 
             gene_set_result.custom_name = f"GeneSetResult {gene_set_name}"
+            gene_set_result.test_l1 = self.test_1
+            gene_set_result.non_adj_p = self.p_value
+            gene_set_result.non_adj_med_exp_p = self.med_exp_p_value 
+            gene_set_result.test_median_exp = self.test_median_exp 
+            gene_set_result.projections_1 = self.projections_1
+            gene_set_result.projections_2 = self.projections_2
+
             # Store the instance of GeneSetResult in the dictionary using gene set name as the key
             results[gene_set_name] = gene_set_result
             #print('null geneset size:', self.nullgenesetsize)
@@ -1401,7 +1484,7 @@ class ROMA:
         return 
 
     
-    def save_ROMA_results(adata, path):
+    def save_ROMA_results(self, adata, path):
         # saves the adata to a path
         import pickle 
         d = adata.uns['ROMA']
@@ -1413,8 +1496,21 @@ class ROMA:
         adata.write(f"{path}.h5ad")
 
         return
+    
+    def save_active_modules_results(self, adata, path):
+        
+        active_modules = adata.uns['ROMA_active_modules'].index
 
-    def load_ROMA_results(path):
+        selected_dict = {k: v for k, v in adata.uns['ROMA'].items() if k in active_modules}
+        adata.uns['ROMA'] = selected_dict
+
+
+        del adata.uns['ROMA']
+        adata.write(f"{path}.h5ad")
+
+        return
+
+    def load_ROMA_results(self, path):
         # loads the results into adata
         import pickle
         import scanpy as sc 
@@ -1424,7 +1520,7 @@ class ROMA:
 
         adata = sc.read_h5ad(f'{path}.h5ad')
         adata.uns['ROMA'] = d
-
+        del d
         return adata
         
     
