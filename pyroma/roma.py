@@ -1484,7 +1484,7 @@ class ROMA:
         return 
 
     
-    def save_ROMA_results(self, adata, path):
+    def _save_ROMA_results(self, adata, path):
         # saves the adata to a path
         import pickle 
         d = adata.uns['ROMA']
@@ -1498,19 +1498,99 @@ class ROMA:
         return
     
     def save_active_modules_results(self, adata, path):
-        
+        import pickle
+        import os
+
+        output_dir = path
+
         active_modules = adata.uns['ROMA_active_modules'].index
 
         selected_dict = {k: v for k, v in adata.uns['ROMA'].items() if k in active_modules}
         adata.uns['ROMA'] = selected_dict
 
+        # Loop over each key in the filtered dictionary
+        for key, gene_set_result in selected_dict.items():
+            # Create a subfolder for each key
+            key_dir = os.path.join(output_dir, key)
+            os.makedirs(key_dir, exist_ok=True)
+            
+            # Loop over each attribute defined in the mapping
+            for attr, attr_type in attributes.items():
+                # Retrieve attribute value, handling the dotted attribute for "svd.components_"
+                if "." in attr:
+                    parts = attr.split(".")
+                    attr_value = getattr(gene_set_result, parts[0], None)
+                    if attr_value is not None:
+                        attr_value = getattr(attr_value, parts[1], None)
+                else:
+                    attr_value = getattr(gene_set_result, attr, None)
+                
+                # If the attribute exists, save it to a file
+                if attr_value is not None:
+                    file_name = f"{attr}"
+                    file_path = os.path.join(key_dir, file_name)
+                    
+                    if attr_type == "numpy.ndarray":
+                        # Save numpy array (np.save writes binary files; extension can be arbitrary)
+                        np.save(file_path, attr_value)
+                    elif attr_type == "list":
+                        # Save list using pickle
+                        with open(file_path, "wb") as f:
+                            pickle.dump(attr_value, f)
 
         del adata.uns['ROMA']
         adata.write(f"{path}.h5ad")
 
         return
+    
 
-    def load_ROMA_results(self, path):
+    def load_active_modules_results(self, path):
+        import os
+        import numpy as np
+        import pickle
+        from types import SimpleNamespace
+
+        output_dir = path
+
+        loaded_dict = {}
+
+        # Loop through each folder (each folder name is expected to be a key)
+        for key in os.listdir(output_dir):
+            key_dir = os.path.join(output_dir, key)
+            if os.path.isdir(key_dir):
+                # Create a new GeneSetResult object using placeholders (None) for the parameters
+                gene_set = GeneSetResult(None, None, None, None, None, None, None, None, None, None)
+                
+                # Iterate over files within the folder
+                for file in os.listdir(key_dir):
+                    file_path = os.path.join(key_dir, file)
+                    # Attribute name is the filename without the ".file" extension
+                    attr_name = file.replace(".file", "")
+                    
+                    if attr_name == "subsetlist":
+                        gene_set.subsetlist = np.load(file_path, allow_pickle=True)
+                    elif attr_name == "outliers":
+                        with open(file_path, "rb") as f:
+                            gene_set.outliers = pickle.load(f)
+                    elif attr_name == "projections_1":
+                        gene_set.projections_1 = np.load(file_path, allow_pickle=True)
+                    elif attr_name == "projections_2":
+                        gene_set.projections_2 = np.load(file_path, allow_pickle=True)
+                    elif attr_name == "svd.components_":
+                        # Load the numpy array for svd.components_
+                        components = np.load(file_path, allow_pickle=True)
+                        # Create a dummy object (using SimpleNamespace) to hold the attribute
+                        gene_set.svd = SimpleNamespace(components_=components)
+                        
+                loaded_dict[key] = gene_set
+        
+        self.adata = sc.read_h5ad(f"{path}.h5ad")
+        self.adata['uns'] = loaded_dict
+        
+        return
+
+
+    def _load_ROMA_results(self, path):
         # loads the results into adata
         import pickle
         import scanpy as sc 
