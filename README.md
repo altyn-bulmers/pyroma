@@ -14,7 +14,7 @@ conda activate pyroma
 
 ## Clone main repo with submodules
 ```sh
-git clone git@github.com:altyn-bulmers/pyroma.git pyroma-tutorial
+git clone --branch tutorial --single-branch https://github.com/altyn-bulmers/pyroma.git pyroma-tutorial
 cd pyroma-tutorial
 ```
 
