@@ -285,9 +285,9 @@ class ROMA:
         from scipy.stats import pearsonr, spearmanr, kendalltau
         import os
         
-        output_dir = '/home/az/Projects/01_Curie/06.1_pyROMA_Sofia_results/pyroma_debug/'
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        #output_dir = '/home/az/Projects/01_Curie/06.1_pyROMA_Sofia_results/pyroma_debug/'
+        #if not os.path.exists(output_dir):
+        #    os.makedirs(output_dir)
         
         # Helper functions
         
@@ -680,37 +680,37 @@ class ROMA:
             val = np.sum(GeneScore[ToUse]*Wei[ToUse]*centered_medians)
             #centered_medians = centered_medians.reshape(-1, 1)
             
-            output_file = f'{output_dir}/{gene_set_name}.txt' 
-
-            with open(output_file, "w") as f:
-                f.write(f"Module: {gene_set_name}\n")
-                if centered_medians is not None:
-                    shape = centered_medians.shape
-                    #print(type(shape), type(centered_medians))
-                    #print('shape', shape)
-                    f.write(f"ExpMat Head: {centered_medians}\n")
-                    #f.write(f"Subset Mat: {subset_mat}\n")
-                    f.write(f"ExpMat Shape: {shape[0]} x {shape[1]}\n")
-                    
-                else:
-                    f.write("ExpMat Shape: N/A\n")
-                f.write(f"Raw ExpMat shape: {ExpMat.shape[0]} x {ExpMat.shape[1]}\n")
-                f.write(f"Raw ExpMat Head: {ExpMat[:5, :5]}\n")
-                f.write(f"GeneScore Shape: {len(GeneScore)}\n")
-                f.write(f"Gene Score: {GeneScore}\n")
-                f.write(f"GeneScore[ToUse] Shape: {len(GeneScore[ToUse])}\n")
-                f.write(f"GeneScore[ToUse]: {GeneScore[ToUse]}\n")
-                if val is not None:
-                    f.write(f"Computed val: {val}\n")
-                else:
-                    f.write("Computed val: N/A\n")
-
-                if val > 0:
-                    f.write(f"Fix PC Sign output: 1" )
-                    return 1
-                else:
-                    f.write(f"Fix PC Sign output: -1" )
-                    return -1
+            #output_file = f'{output_dir}/{gene_set_name}.txt' 
+#
+            #with open(output_file, "w") as f:
+            #    f.write(f"Module: {gene_set_name}\n")
+            #    if centered_medians is not None:
+            #        shape = centered_medians.shape
+            #        #print(type(shape), type(centered_medians))
+            #        #print('shape', shape)
+            #        f.write(f"ExpMat Head: {centered_medians}\n")
+            #        #f.write(f"Subset Mat: {subset_mat}\n")
+            #        f.write(f"ExpMat Shape: {shape[0]} x {shape[1]}\n")
+            #        
+            #    else:
+            #        f.write("ExpMat Shape: N/A\n")
+            #    f.write(f"Raw ExpMat shape: {ExpMat.shape[0]} x {ExpMat.shape[1]}\n")
+            #    f.write(f"Raw ExpMat Head: {ExpMat[:5, :5]}\n")
+            #    f.write(f"GeneScore Shape: {len(GeneScore)}\n")
+            #    f.write(f"Gene Score: {GeneScore}\n")
+            #    f.write(f"GeneScore[ToUse] Shape: {len(GeneScore[ToUse])}\n")
+            #    f.write(f"GeneScore[ToUse]: {GeneScore[ToUse]}\n")
+            #    if val is not None:
+            #        f.write(f"Computed val: {val}\n")
+            #    else:
+            #        f.write("Computed val: N/A\n")
+#
+            #    if val > 0:
+            #        f.write(f"Fix PC Sign output: 1" )
+            #        return 1
+            #    else:
+            #        f.write(f"Fix PC Sign output: -1" )
+            #        return -1
 
         if Mode == 'UseExtremeWeights':
             """

@@ -28,7 +28,7 @@ roma.compute()
 
 ## Clone main repo with submodules
 ```sh
-git clone --recurse-submodules git@github.com:yourusername/pyroma.git
+git clone --recurse-submodules git@github.com:altyn-bulmers/pyroma.git
 ```
 
 
