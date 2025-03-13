@@ -840,7 +840,7 @@ class ROMA:
 
         return l1, median_exp, null_projections_1, null_projections_2
         
-    ### C from rROMA
+    ### from rROMA
     def randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', 
                         incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
         """
@@ -911,61 +911,7 @@ class ROMA:
             minutes, seconds = divmod(elapsed, 60)
             print(f"Running time: {int(minutes):02}:{seconds:05.2f}")
         
-        def original_randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
-            """
-            Calculates scores for the random gene set of the same size and returns null distributions of scores.
-            """
-            from joblib import Parallel, delayed
-            import time
-
-            # Start timer
-            start = time.time()
-
-            # Calculate null gene set size by finding the closest size 
-            # from filtered geneset sizes by approx_sample in the log scale 
-            
-            candidate_nullgeneset_size = self.nullgenesetsize
-            #len(self.subsetlist)
-
-            # If the null distribution with this null geneset size was caclulated, pass to the next pathway
-            if candidate_nullgeneset_size in self.null_distributions:
-                self.nulll1, self.null_median_exp = self.null_distributions[candidate_nullgeneset_size]
-                print('Took null distribution from previous calculation')
-            else: 
-                # Define the number of iterationsself.null_geneset_sizes
-                num_iterations = iters
-                sequence = np.arange(self.adata.shape[1])
-                idx = self.adata.var.index.to_numpy()
-
-                # Use parallel processing to process iterations
-                results = Parallel(n_jobs=-1, prefer=prefer_type)(
-                    delayed(self.process_iteration)(sequence, idx, iteration, incremental, partial_fit, algorithm) for iteration in range(num_iterations)
-                )
-
-                # Unzip the results
-                nulll1, null_median_exp, null_projections_1, null_projections_2 = list(zip(*results))
-                nulll1_array = np.array(nulll1)
-                null_median_exp = np.array(null_median_exp)
-                null_projections_1 = np.array(null_projections_1)
-                null_projections_2 = np.array(null_projections_2)
-                null_projections = np.stack((null_projections_1, null_projections_2), axis=1)
-                # update the dictiorary with null distributions 
-                self.null_distributions[candidate_nullgeneset_size] = [np.copy(nulll1_array), np.copy(null_median_exp)]
-                # Store results in the object
-                self.nulll1 = np.copy(nulll1_array)
-                self.null_median_exp = np.copy(null_median_exp)
-                self.null_projections = np.copy(null_projections)
-
-                # Calculate elapsed time
-                end = time.time()
-                elapsed_time = end - start
-                minutes, seconds = divmod(elapsed_time, 60)
-
-                # Verbose output
-                if verbose:
-                    print(f"Running time (min): {int(minutes):02}:{seconds:05.2f}")
-
-            return
+    
 
     def wilcoxon_assess_significance(self, results):
         
@@ -1091,135 +1037,6 @@ class ROMA:
             gene_set_result.q_value = qs[i]
             gene_set_result.med_exp_q_value = med_exp_qs[i]
 
-        return results
-
-    def old_assess_significance(self, results):
-       # TODO: output the median of null_L1 distribution
-       # TODO: incorporate an option to compute p-values via wilcoxon 
-        """
-        Computes the empirical p-value based on the null distribution of L1 scores and median expression.
-        Adjust p-values and q-values using the Benjamini-Hochberg procedure.
-        """
-        from scipy.stats import false_discovery_control as benj_hoch
-        from statsmodels.stats.multitest import multipletests
-        import numpy as np
-        from scipy.stats import wilcoxon
-        
-        #valid_results = {name: result for name, result in results if result is not None}
-        ps = np.zeros(shape=len(results))
-        qs = np.zeros(shape=len(results))
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            #print('PRINTING to fix the ERROR', gene_set_result.nulll1)
-            #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
-            null_distribution = gene_set_result.nulll1[:,0]
-            null_median_distribution = gene_set_result.null_median_exp
-            #print('shape of the null distribution: ', null_distribution.shape)
-            #print('shape of null med distribution: ', null_median_distribution.shape)
-
-            # L1 statistics
-            test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
-            #p_value = (np.sum(null_distribution >= test_l1) + 1) / (len(null_distribution) + 1) # original value
-            p_value = np.mean(np.array(null_distribution) >= test_l1)
-            # changing that to wilcoxon as in rROMA
-            #_, wilcoxon_p_l1 = wilcoxon(null_distribution - test_l1, alternative='two-sided', method='exact')
-            #p_value = wilcoxon_p_l1
-            
-
-            # otherwise p_value could be calculated with (np.sum(null_distribution >= test_l1)) / (len(null_distribution))
-            ps[i] =  p_value #if p_value <= 1.0 else 1.0
-            gene_set_result.test_l1 = test_l1
-
-            gene_set_name = gene_set_result.custom_name.split(maxsplit=1)[-1]
-            # Median Exp statistic
-
-            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X, gene_set_result.raw_X_subset, gene_set_name)
-            #test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X, gene_set_name)
-            q_value = (np.sum(np.abs(null_median_distribution) >= np.abs(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
-            #q_value = (np.sum((null_median_distribution) >=(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
-            
-            # from the rROMA 
-            #_, wilcoxon_p_pc1_mean = wilcoxon(null_median_distribution - test_median_exp, alternative='greater')
-            #q_value = wilcoxon_p_pc1_mean
-            
-            qs[i] = q_value
-            gene_set_result.test_median_exp = test_median_exp
-            gene_set_result.projections_1 = projections_1
-            gene_set_result.projections_2 = projections_2
-
-
-        #print('raw p-values', ps)
-        #print('raw q-values', qs)
-        adjusted_ps = benj_hoch(ps)
-        adjusted_qs = benj_hoch(qs)
-        # confirm the same lengths of lists
-        #print('Lengths of ps and adj_ps match and match the adj_qs', len(ps) == len(adjusted_ps), len(adjusted_ps) == len(adjusted_qs) )
-        
-        #all_p_values = np.array(ps + qs) # if they're lists
-        #all_p_values =  np.concatenate((ps,qs))
-        #print('All p Values shape ', all_p_values.shape)
-        #_, adjusted_p_values, _, _ = multipletests(all_p_values, method='fdr_bh')
-        
-        #print('All adjusted p Values shape ', adjusted_p_values.shape)
-
-
-        #n = len(results)
-        #adjusted_ps = adjusted_p_values[:n]
-        #adjusted_qs = adjusted_p_values[n:]
-
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            gene_set_result.p_value = adjusted_ps[i]
-            gene_set_result.non_adj_p = ps[i]
-            gene_set_result.q_value = adjusted_qs[i]
-            gene_set_result.non_adj_q = qs[i]
-        return results
-    
-    
-    def old_old_assess_significance(self, results):
-        
-        # TODO: outputx the non-adjusted p-s and Median exp non-adj p-s well
-        
-        """
-        Computes the empirical p-value based on the null distribution of L1 scores and median expression.
-        Adjust p-values and q-values using the Benjamini-Hochberg procedure.
-        """
-        from scipy.stats import false_discovery_control as benj_hoch
-        
-        #valid_results = {name: result for name, result in results if result is not None}
-        ps = np.zeros(shape=len(results))
-        qs = np.zeros(shape=len(results))
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            #print('PRINTING to fix the ERROR', gene_set_result.nulll1)
-            #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
-            null_distribution = gene_set_result.nulll1[:,0]
-            null_median_distribution = gene_set_result.null_median_exp
-
-            # L1 statistics
-            test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
-            p_value = (np.sum(null_distribution >= test_l1) + 1) / (len(null_distribution) + 1)
-            # otherwise p_value could be calculated with (np.sum(null_distribution >= test_l1)) / (len(null_distribution))
-            ps[i] =  p_value #if p_value <= 1.0 else 1.0
-            gene_set_result.test_l1 = test_l1
-
-            # Median Exp statistic
-            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X)
-            q_value = (np.sum(null_median_distribution >= test_median_exp) + 1) / (len(null_median_distribution) + 1)
-            qs[i] = q_value
-            gene_set_result.test_median_exp = test_median_exp
-            gene_set_result.projections_1 = projections_1
-            gene_set_result.projections_2 = projections_2
-
-        #print('raw p-values', ps)
-        #print('raw q-values', qs)
-        adjusted_ps = benj_hoch(ps)
-        adjusted_qs = benj_hoch(qs)
-        # confirm the same lengths of lists
-        #print('Lengths of ps and adj_ps match and match the adj_qs', len(ps) == len(adjusted_ps), len(adjusted_ps) == len(adjusted_qs) )
-        
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            gene_set_result.p_value = adjusted_ps[i]
-            gene_set_result.non_adj_p = ps[i]
-            gene_set_result.q_value = adjusted_qs[i]
-            gene_set_result.non_adj_q = qs[i]
         return results
 
     def approx_size(self, flag):
@@ -1454,35 +1271,6 @@ class ROMA:
 
         return
     
-
-    def _randomset_jax(self, subsetlist, outliers, verbose=1, iters=12):
-        import time 
-        import jax.numpy as jnp
-
-        nullgenesetsize = sum(1 for i in range(len(subsetlist)) if i not in outliers)
-        self.nullgenesetsize = nullgenesetsize
-        sequence = np.arange(self.adata.shape[1])
-        idx = self.adata.var.index.to_numpy()
-
-        subset = np.random.choice(sequence, self.nullgenesetsize, replace=False)
-        #idx = self.adata.var.index.to_numpy()
-        gene_subset = np.array([x for i, x in enumerate(idx) if i in subset])
-        outliers = self.loocv(self.adata[:,[x for x in gene_subset]], for_randomset=True)
-        np.random.seed(iteration)
-
-        #svd_, X = self.robustPCA(self.adata, gene_subset, outliers, for_randomset=True)
-        
-        for loop_i, x in enumerate(Xs):
-            u, s, vt = jnp.linalg.svd(x, full_matrices=False)
-            l1, l2 = svd_.explained_variance_ratio_
-
-
-        if verbose:
-            minutes, seconds = divmod(tac - tic, 60)
-            print(f"loop {i} time: " + "{:0>2}:{:05.2f}".format(int(minutes), seconds))   
-
-        return 
-
     
     def _save_ROMA_results(self, adata, path):
         # saves the adata to a path
@@ -1497,16 +1285,26 @@ class ROMA:
 
         return
     
-    def save_active_modules_results(self, adata, path):
+    def save_active_modules_results(self, path):
         import pickle
         import os
 
+
         output_dir = path
+        adata = self.adata 
 
         active_modules = adata.uns['ROMA_active_modules'].index
 
         selected_dict = {k: v for k, v in adata.uns['ROMA'].items() if k in active_modules}
         adata.uns['ROMA'] = selected_dict
+
+        attributes = {
+           "subsetlist": "numpy.ndarray",
+            "outliers": "list",
+            "projections_1": "numpy.ndarray",
+            "projections_2": "numpy.ndarray",
+            "svd.components_": "numpy.ndarray"
+        }
 
         # Loop over each key in the filtered dictionary
         for key, gene_set_result in selected_dict.items():
@@ -1538,8 +1336,11 @@ class ROMA:
                         with open(file_path, "wb") as f:
                             pickle.dump(attr_value, f)
 
-        del adata.uns['ROMA']
-        adata.write(f"{path}.h5ad")
+        
+        adata.uns['ROMA_stats'].to_csv(f"{path}/ROMA_stats.csv") 
+        adata.uns['ROMA_active_modules'].to_csv(f"{path}/ROMA_active_modules.csv")
+        del adata.uns['ROMA'] 
+        adata.write(f"{path}/roma_adata.h5ad")
 
         return
     
@@ -1547,6 +1348,7 @@ class ROMA:
     def load_active_modules_results(self, path):
         import os
         import numpy as np
+        import pandas as pd
         import pickle
         from types import SimpleNamespace
 
@@ -1559,7 +1361,7 @@ class ROMA:
             key_dir = os.path.join(output_dir, key)
             if os.path.isdir(key_dir):
                 # Create a new GeneSetResult object using placeholders (None) for the parameters
-                gene_set = GeneSetResult(None, None, None, None, None, None, None, None, None, None)
+                gene_set = self.GeneSetResult(None, None, None, None, None)
                 
                 # Iterate over files within the folder
                 for file in os.listdir(key_dir):
@@ -1584,9 +1386,11 @@ class ROMA:
                         
                 loaded_dict[key] = gene_set
         
-        self.adata = sc.read_h5ad(f"{path}.h5ad")
-        self.adata['uns'] = loaded_dict
-        
+        self.adata = sc.read_h5ad(f"{path}/roma_adata.h5ad")
+        self.adata.uns['ROMA'] = loaded_dict
+        self.adata.uns['ROMA_stats'] = pd.read_csv(f"{path}/ROMA_stats.csv") 
+        self.adata.uns['ROMA_active_modules'] = pd.read_csv(f"{path}/ROMA_active_modules.csv")
+
         return
 
 
