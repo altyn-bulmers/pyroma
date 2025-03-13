@@ -10,10 +10,11 @@
 conda env create -f environment.yml
 ```
 
-## Install using pip
 
+## Clone main repo with submodules
 ```sh
-pip install roma-analysis
+git clone git@github.com:altyn-bulmers/pyroma.git pyroma-tutorial
+cd pyroma-tutorial
 ```
 
 ## Run roma on your data
@@ -24,11 +25,6 @@ roma = pyroma.ROMA()
 roma.adata = adata
 roma.gmt = 'h.all.v2023.2.Hs.symbols.gmt'
 roma.compute()
-```
-
-## Clone main repo with submodules
-```sh
-git clone --recurse-submodules git@github.com:altyn-bulmers/pyroma.git
 ```
 
 
