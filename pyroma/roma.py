@@ -26,6 +26,9 @@ class ROMA:
         self.subset = None
         self.subsetlist = None
         self.outliers = []
+        self.loocv_scores = {}
+        self.global_gene_counts = {} # fisher
+        self.global_outlier_counts = {} # fisher
         self.svd = None
         self.X = None
         self.raw_X_subset = None
@@ -151,6 +154,11 @@ class ROMA:
             svd.fit(X[train_index])
             l1 = svd.explained_variance_ratio_[0]
             l1scores.append(l1)
+            
+        loocv_scores = {}
+        for i, g in enumerate(subset.var_names):
+            loocv_scores[g] = l1scores[i]  
+        self.loocv_scores = loocv_scores
 
         if len(l1scores) > 1:
             u = np.mean(l1scores)
@@ -166,6 +174,151 @@ class ROMA:
             print(f"Number of outliers detected: {len(outliers)}")
 
         return outliers
+
+    
+
+    def fisher_outlier_filter(self, gene_outlier_counts, gene_pathway_counts,
+                            outlier_fisher_thr=0.05, min_gene_sets=3):
+        """
+        Determines whether each gene should be considered an outlier based on a Fisher exact test.
+        
+        For each gene, the function compares the number of times it was flagged as an outlier
+        (gene_outlier_counts) to the total number of gene sets in which it appears (gene_pathway_counts)
+        against the corresponding overall totals from all genes. The 2x2 contingency table is constructed as:
+        
+            [[ total_outliers - gene_outlier_count, gene_outlier_count ],
+            [ total_pathways - gene_pathway_count, gene_pathway_count ]]
+        
+        Then a one-sided Fisher test is performed (using the 'greater' alternative) to test
+        whether the gene’s proportion of outlier calls is significantly higher than the global average.
+        
+        Additionally, if a gene appears in fewer than `min_gene_sets` collections,
+        it is always kept (i.e. not marked as an outlier) regardless of the Fisher test.
+        
+        Parameters
+        ----------
+        gene_outlier_counts : dict
+            Dictionary mapping gene name to the number of gene sets in which it was flagged as an outlier.
+        gene_pathway_counts : dict
+            Dictionary mapping gene name to the total number of gene sets in which the gene appears.
+        outlier_fisher_thr : float, optional
+            The significance threshold for the Fisher test p-value. A gene is considered
+            significantly aberrant (and hence an outlier) if p < outlier_fisher_thr.
+            (Default is 0.05.)
+        min_gene_sets : int, optional
+            Minimum number of gene sets a gene must appear in to be eligible for being
+            flagged as an outlier. Genes with fewer appearances are always kept.
+            (Default is 3.)
+        
+        Returns
+        -------
+        gene_outlier_flags : dict
+            Dictionary mapping each gene to a Boolean value: True if the gene is considered
+            an outlier (i.e. its aberrant behavior is statistically significant), False otherwise.
+        """
+
+        from scipy.stats import fisher_exact
+        # Compute overall totals for the entire collection
+        total_outliers = sum(gene_outlier_counts.values())
+        total_pathways = sum(gene_pathway_counts.values())
+        
+        gene_outlier_flags = {}
+        for gene, pathways_count in gene_pathway_counts.items():
+            # If gene appears in too few gene sets, do not mark it as an outlier
+            if pathways_count < min_gene_sets:
+                gene_outlier_flags[gene] = False
+                continue
+            
+            # Get the number of outlier calls for this gene (defaulting to 0 if not present)
+            gene_outlier = gene_outlier_counts.get(gene, 0)
+            
+            # Build the contingency table:
+            # Row 1: counts for "other genes"
+            # Row 2: counts for the gene of interest
+            table = [
+                [total_outliers - gene_outlier, gene_outlier],
+                [total_pathways - pathways_count, pathways_count]
+            ]
+            
+            # Perform a one-sided Fisher exact test (alternative='greater' checks if the gene's
+            # proportion of outliers is higher than that of the remainder)
+            _, p_value = fisher_exact(table, alternative='greater')
+            
+            # According to the R implementation, if the p-value is high (>= threshold)
+            # then the gene is NOT significantly aberrant (and hence kept). Here, we flag a gene
+            # as an outlier if p < threshold.
+            gene_outlier_flags[gene] = (p_value < outlier_fisher_thr)
+            
+        return gene_outlier_flags
+
+    # Optional: a helper function to limit the fraction of genes in a given gene set that
+    # are removed as outliers. For example, if too many genes are flagged by LOOCV + Fisher test,
+    # you may wish to only remove the ones with the most extreme behavior.
+    def limit_outliers_per_geneset(self, gene_set, gene_flags, loocv_scores, max_outlier_prop=0.5):
+        """
+        Given a list of genes in a gene set and a dictionary of flags indicating whether each gene
+        is considered an outlier (from the Fisher test), limit the fraction of genes flagged as outliers
+        to at most max_outlier_prop (e.g. 50%).
+        
+        Parameters
+        ----------
+        gene_set : list of str
+            List of gene names in the gene set.
+        gene_flags : dict
+            Dictionary mapping gene name to Boolean flag (True if flagged as outlier).
+        loocv_scores : dict
+            Dictionary mapping gene name to a LOOCV statistic (or other measure of extremity).
+            Genes with more extreme LOOCV scores are given priority to be marked as outliers.
+        max_outlier_prop : float, optional
+            Maximum proportion of genes in the gene set that can be removed as outliers.
+            (Default is 0.5.)
+        
+        Returns
+        -------
+        filtered_flags : dict
+            Updated gene_flags dictionary in which at most max_outlier_prop fraction of genes
+            in gene_set are flagged as outliers.
+        """
+        # Identify genes flagged as outliers in the gene set
+        flagged_genes = [g for g in gene_set if gene_flags.get(g, False)]
+        allowed_num = int(max_outlier_prop * len(gene_set))
+        if len(flagged_genes) > allowed_num:
+            # Sort the flagged genes by the absolute value of their LOOCV score (or other score)
+            # in descending order so that the most extreme ones remain flagged.
+            flagged_sorted = sorted(flagged_genes, key=lambda g: abs(loocv_scores.get(g, 0)), reverse=True)
+            # Only the top 'allowed_num' genes remain flagged as outliers.
+            keep_flagged = set(flagged_sorted[:allowed_num])
+            # Update flags: unflag genes not in the top allowed group
+            for g in gene_set:
+                if g in flagged_genes:
+                    gene_flags[g] = (g in keep_flagged)
+        return gene_flags
+
+    # ===== Example usage =====
+    # Suppose that during your analysis you have tallied for each gene:
+    #   - gene_outlier_counts: the number of gene sets in which the gene was flagged by LOOCV.
+    #   - gene_pathway_counts: the total number of gene sets in which the gene appears.
+    #
+    # For example:
+    #
+    # gene_outlier_counts = {'GeneA': 5, 'GeneB': 1, 'GeneC': 0, 'GeneD': 4}
+    # gene_pathway_counts = {'GeneA': 10, 'GeneB': 3, 'GeneC': 8, 'GeneD': 10}
+    #
+    # You can then decide which genes are significantly aberrant:
+    #
+    # flags = fisher_outlier_filter(gene_outlier_counts, gene_pathway_counts,
+    #                               outlier_fisher_thr=0.05, min_gene_sets=3)
+    #
+    # For a specific gene set (list of genes) and if you have LOOCV scores for each gene,
+    # you can further limit the fraction of outliers:
+    #
+    # gene_set = ['GeneA', 'GeneB', 'GeneC', 'GeneD']
+    # # Suppose loocv_scores contains a measure of extremity for each gene:
+    # loocv_scores = {'GeneA': 2.3, 'GeneB': 1.5, 'GeneC': 0.5, 'GeneD': 3.1}
+    # filtered_flags = limit_outliers_per_geneset(gene_set, flags, loocv_scores, max_outlier_prop=0.5)
+    #
+    # In this example, even if the Fisher test would flag more than 50% of genes as outliers,
+    # the final decision is limited to the most extreme ones.
 
 
     def robustTruncatedSVD(self, adata, subsetlist, outliers, for_randomset=False, algorithm='randomized'):
@@ -658,7 +811,8 @@ class ROMA:
                     # In R code: ExpMat <- scale(apply(ExpMat, 1, median), center=TRUE, scale=FALSE)
                     # apply(ExpMat,1,median) gives a median per gene: a vector of length=ngenes
                     # scale(...) center=TRUE means subtract mean
-                    median_per_gene = ExpMat.median(axis=1).values
+                    #median_per_gene = ExpMat.median(axis=1).values #before
+                    median_per_gene = np.median(ExpMat, axis=1)
                     centered_median = median_per_gene - np.mean(median_per_gene)
                     val = np.sum(GeneScore[ToUse] * Wei[ToUse] * centered_median[ToUse])
                     if val > 0:
@@ -911,61 +1065,7 @@ class ROMA:
             minutes, seconds = divmod(elapsed, 60)
             print(f"Running time: {int(minutes):02}:{seconds:05.2f}")
         
-        def original_randomset_parallel(self, subsetlist, outliers, verbose=1, prefer_type='processes', incremental=False, iters=100, partial_fit=False, algorithm='randomized'):
-            """
-            Calculates scores for the random gene set of the same size and returns null distributions of scores.
-            """
-            from joblib import Parallel, delayed
-            import time
-
-            # Start timer
-            start = time.time()
-
-            # Calculate null gene set size by finding the closest size 
-            # from filtered geneset sizes by approx_sample in the log scale 
-            
-            candidate_nullgeneset_size = self.nullgenesetsize
-            #len(self.subsetlist)
-
-            # If the null distribution with this null geneset size was caclulated, pass to the next pathway
-            if candidate_nullgeneset_size in self.null_distributions:
-                self.nulll1, self.null_median_exp = self.null_distributions[candidate_nullgeneset_size]
-                print('Took null distribution from previous calculation')
-            else: 
-                # Define the number of iterationsself.null_geneset_sizes
-                num_iterations = iters
-                sequence = np.arange(self.adata.shape[1])
-                idx = self.adata.var.index.to_numpy()
-
-                # Use parallel processing to process iterations
-                results = Parallel(n_jobs=-1, prefer=prefer_type)(
-                    delayed(self.process_iteration)(sequence, idx, iteration, incremental, partial_fit, algorithm) for iteration in range(num_iterations)
-                )
-
-                # Unzip the results
-                nulll1, null_median_exp, null_projections_1, null_projections_2 = list(zip(*results))
-                nulll1_array = np.array(nulll1)
-                null_median_exp = np.array(null_median_exp)
-                null_projections_1 = np.array(null_projections_1)
-                null_projections_2 = np.array(null_projections_2)
-                null_projections = np.stack((null_projections_1, null_projections_2), axis=1)
-                # update the dictiorary with null distributions 
-                self.null_distributions[candidate_nullgeneset_size] = [np.copy(nulll1_array), np.copy(null_median_exp)]
-                # Store results in the object
-                self.nulll1 = np.copy(nulll1_array)
-                self.null_median_exp = np.copy(null_median_exp)
-                self.null_projections = np.copy(null_projections)
-
-                # Calculate elapsed time
-                end = time.time()
-                elapsed_time = end - start
-                minutes, seconds = divmod(elapsed_time, 60)
-
-                # Verbose output
-                if verbose:
-                    print(f"Running time (min): {int(minutes):02}:{seconds:05.2f}")
-
-            return
+        return
 
     def wilcoxon_assess_significance(self, results):
         
@@ -1093,134 +1193,8 @@ class ROMA:
 
         return results
 
-    def old_assess_significance(self, results):
-       # TODO: output the median of null_L1 distribution
-       # TODO: incorporate an option to compute p-values via wilcoxon 
-        """
-        Computes the empirical p-value based on the null distribution of L1 scores and median expression.
-        Adjust p-values and q-values using the Benjamini-Hochberg procedure.
-        """
-        from scipy.stats import false_discovery_control as benj_hoch
-        from statsmodels.stats.multitest import multipletests
-        import numpy as np
-        from scipy.stats import wilcoxon
-        
-        #valid_results = {name: result for name, result in results if result is not None}
-        ps = np.zeros(shape=len(results))
-        qs = np.zeros(shape=len(results))
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            #print('PRINTING to fix the ERROR', gene_set_result.nulll1)
-            #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
-            null_distribution = gene_set_result.nulll1[:,0]
-            null_median_distribution = gene_set_result.null_median_exp
-            #print('shape of the null distribution: ', null_distribution.shape)
-            #print('shape of null med distribution: ', null_median_distribution.shape)
-
-            # L1 statistics
-            test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
-            #p_value = (np.sum(null_distribution >= test_l1) + 1) / (len(null_distribution) + 1) # original value
-            p_value = np.mean(np.array(null_distribution) >= test_l1)
-            # changing that to wilcoxon as in rROMA
-            #_, wilcoxon_p_l1 = wilcoxon(null_distribution - test_l1, alternative='two-sided', method='exact')
-            #p_value = wilcoxon_p_l1
-            
-
-            # otherwise p_value could be calculated with (np.sum(null_distribution >= test_l1)) / (len(null_distribution))
-            ps[i] =  p_value #if p_value <= 1.0 else 1.0
-            gene_set_result.test_l1 = test_l1
-
-            gene_set_name = gene_set_result.custom_name.split(maxsplit=1)[-1]
-            # Median Exp statistic
-
-            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X, gene_set_result.raw_X_subset, gene_set_name)
-            #test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X, gene_set_name)
-            q_value = (np.sum(np.abs(null_median_distribution) >= np.abs(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
-            #q_value = (np.sum((null_median_distribution) >=(test_median_exp)) + 1) / (len(null_median_distribution) + 1)
-            
-            # from the rROMA 
-            #_, wilcoxon_p_pc1_mean = wilcoxon(null_median_distribution - test_median_exp, alternative='greater')
-            #q_value = wilcoxon_p_pc1_mean
-            
-            qs[i] = q_value
-            gene_set_result.test_median_exp = test_median_exp
-            gene_set_result.projections_1 = projections_1
-            gene_set_result.projections_2 = projections_2
-
-
-        #print('raw p-values', ps)
-        #print('raw q-values', qs)
-        adjusted_ps = benj_hoch(ps)
-        adjusted_qs = benj_hoch(qs)
-        # confirm the same lengths of lists
-        #print('Lengths of ps and adj_ps match and match the adj_qs', len(ps) == len(adjusted_ps), len(adjusted_ps) == len(adjusted_qs) )
-        
-        #all_p_values = np.array(ps + qs) # if they're lists
-        #all_p_values =  np.concatenate((ps,qs))
-        #print('All p Values shape ', all_p_values.shape)
-        #_, adjusted_p_values, _, _ = multipletests(all_p_values, method='fdr_bh')
-        
-        #print('All adjusted p Values shape ', adjusted_p_values.shape)
-
-
-        #n = len(results)
-        #adjusted_ps = adjusted_p_values[:n]
-        #adjusted_qs = adjusted_p_values[n:]
-
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            gene_set_result.p_value = adjusted_ps[i]
-            gene_set_result.non_adj_p = ps[i]
-            gene_set_result.q_value = adjusted_qs[i]
-            gene_set_result.non_adj_q = qs[i]
-        return results
     
     
-    def old_old_assess_significance(self, results):
-        
-        # TODO: outputx the non-adjusted p-s and Median exp non-adj p-s well
-        
-        """
-        Computes the empirical p-value based on the null distribution of L1 scores and median expression.
-        Adjust p-values and q-values using the Benjamini-Hochberg procedure.
-        """
-        from scipy.stats import false_discovery_control as benj_hoch
-        
-        #valid_results = {name: result for name, result in results if result is not None}
-        ps = np.zeros(shape=len(results))
-        qs = np.zeros(shape=len(results))
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            #print('PRINTING to fix the ERROR', gene_set_result.nulll1)
-            #print('NULL MEDIAN EXP', gene_set_result.null_median_exp)
-            null_distribution = gene_set_result.nulll1[:,0]
-            null_median_distribution = gene_set_result.null_median_exp
-
-            # L1 statistics
-            test_l1 = gene_set_result.svd.explained_variance_ratio_[0]
-            p_value = (np.sum(null_distribution >= test_l1) + 1) / (len(null_distribution) + 1)
-            # otherwise p_value could be calculated with (np.sum(null_distribution >= test_l1)) / (len(null_distribution))
-            ps[i] =  p_value #if p_value <= 1.0 else 1.0
-            gene_set_result.test_l1 = test_l1
-
-            # Median Exp statistic
-            test_median_exp, projections_1, projections_2 = self.compute_median_exp(gene_set_result.svd, gene_set_result.X)
-            q_value = (np.sum(null_median_distribution >= test_median_exp) + 1) / (len(null_median_distribution) + 1)
-            qs[i] = q_value
-            gene_set_result.test_median_exp = test_median_exp
-            gene_set_result.projections_1 = projections_1
-            gene_set_result.projections_2 = projections_2
-
-        #print('raw p-values', ps)
-        #print('raw q-values', qs)
-        adjusted_ps = benj_hoch(ps)
-        adjusted_qs = benj_hoch(qs)
-        # confirm the same lengths of lists
-        #print('Lengths of ps and adj_ps match and match the adj_qs', len(ps) == len(adjusted_ps), len(adjusted_ps) == len(adjusted_qs) )
-        
-        for i, (_, gene_set_result) in enumerate(results.items()):
-            gene_set_result.p_value = adjusted_ps[i]
-            gene_set_result.non_adj_p = ps[i]
-            gene_set_result.q_value = adjusted_qs[i]
-            gene_set_result.non_adj_q = qs[i]
-        return results
 
     def approx_size(self, flag):
         """
@@ -1315,7 +1289,7 @@ class ROMA:
         df['q Med Exp'] = pd.Series(q_med_exp_dict)
         return df
     
-    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=False):        
+    def compute(self, selected_gene_sets, parallel=False, incremental=False, iters=100, partial_fit=False, algorithm='randomized', loocv_on=True, double_mean_centering=False, outlier_fisher_thr=0.05, min_gene_sets=3, max_outlier_prop=0.5):        
         
         #pl.adata = self.adata
         """
@@ -1377,19 +1351,43 @@ class ROMA:
         for gene_set_name in sorted_gene_sets:
             print(f'Processing gene set: {color.BOLD}{color.DARKCYAN}{gene_set_name}{color.END}', end=' | ')
             self.subsetting(self.adata, self.genesets[gene_set_name])
-            print('len of subsetlist:', color.BOLD, len(self.subsetlist), color.END)
+            print('len of subsetlist:', color.BOLD, len(self.subsetlist), color.END, end = ' ')
             if len(self.subsetlist) < self.min_n_genes:
                 unprocessed_genesets.append(gene_set_name)
+                print("| smaller than min n genes for geneset |")
                 continue
+            else:
+                print()
             if loocv_on:
                 self.loocv(self.subset)
             
+            if len(self.outliers) > 0:
+                print(self.outliers, self.subsetlist[self.outliers[0]])
+            # ===== Fisher test =====
+            # Update global counts (or local counts per gene set) for each gene:
+            for gene in self.subsetlist:
+                self.global_gene_counts[gene] = self.global_gene_counts.get(gene, 0) + 1
+            for outlier_idx in self.outliers:
+                gene_name = self.subsetlist[outlier_idx]
+                self.global_outlier_counts[gene_name] = self.global_outlier_counts.get(gene_name, 0) + 1
+
+            # Apply Fisher test to decide if a gene’s outlier proportion is significantly higher
+            gene_flags = self.fisher_outlier_filter(self.global_outlier_counts, self.global_gene_counts,
+                                            outlier_fisher_thr=outlier_fisher_thr, min_gene_sets=min_gene_sets)
+
+            # Optionally, limit the proportion of outliers in the current gene set
+            # LOOCV score per gene in a dictionary self.loocv_scores
+            gene_flags = self.limit_outliers_per_geneset(self.subsetlist, gene_flags, self.loocv_scores, max_outlier_prop=max_outlier_prop)
+
+            # Update the outliers list for the current gene set based on the refined gene_flags
+            self.outliers = [i for i, gene in enumerate(self.subsetlist) if gene_flags.get(gene, False)]
+
             self.approx_size(flag)
             flag = False
 
             if incremental:
-                self.robustPCA(self.adata, self.subsetlist, self.outliers)
-                #self.robustIncrementalPCA(self.adata, self.subsetlist, self.outliers)
+                #self.robustPCA(self.adata, self.subsetlist, self.outliers)
+                self.robustIncrementalPCA(self.adata, self.subsetlist, self.outliers)
                 #self.robustKernelPCA(self.adata, self.subsetlist, self.outliers)
             else:
                 self.robustTruncatedSVD(self.adata, self.subsetlist, self.outliers, algorithm=algorithm)
@@ -1453,76 +1451,128 @@ class ROMA:
         self.adata.uns['ROMA_active_modules'] = active_modules
 
         return
-    
-
-    def _randomset_jax(self, subsetlist, outliers, verbose=1, iters=12):
-        import time 
-        import jax.numpy as jnp
-
-        nullgenesetsize = sum(1 for i in range(len(subsetlist)) if i not in outliers)
-        self.nullgenesetsize = nullgenesetsize
-        sequence = np.arange(self.adata.shape[1])
-        idx = self.adata.var.index.to_numpy()
-
-        subset = np.random.choice(sequence, self.nullgenesetsize, replace=False)
-        #idx = self.adata.var.index.to_numpy()
-        gene_subset = np.array([x for i, x in enumerate(idx) if i in subset])
-        outliers = self.loocv(self.adata[:,[x for x in gene_subset]], for_randomset=True)
-        np.random.seed(iteration)
-
-        #svd_, X = self.robustPCA(self.adata, gene_subset, outliers, for_randomset=True)
-        
-        for loop_i, x in enumerate(Xs):
-            u, s, vt = jnp.linalg.svd(x, full_matrices=False)
-            l1, l2 = svd_.explained_variance_ratio_
-
-
-        if verbose:
-            minutes, seconds = divmod(tac - tic, 60)
-            print(f"loop {i} time: " + "{:0>2}:{:05.2f}".format(int(minutes), seconds))   
-
-        return 
 
     
-    def save_ROMA_results(self, adata, path):
-        # saves the adata to a path
-        import pickle 
-        d = adata.uns['ROMA']
-
-        with open(f'{path}.pickle', 'wb') as handle:
-            pickle.dump(d, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-        del adata.uns['ROMA']
-        adata.write(f"{path}.h5ad")
-
-        return
-    
-    def save_active_modules_results(self, adata, path):
-        
-        active_modules = adata.uns['ROMA_active_modules'].index
-
-        selected_dict = {k: v for k, v in adata.uns['ROMA'].items() if k in active_modules}
-        adata.uns['ROMA'] = selected_dict
-
-
-        del adata.uns['ROMA']
-        adata.write(f"{path}.h5ad")
-
-        return
-
-    def load_ROMA_results(self, path):
-        # loads the results into adata
+    def save_active_modules_results(self, path, only_active=True, save_adata=True):
+        """ 
+             choose to save only active or all pathways 
+        """
         import pickle
-        import scanpy as sc 
+        import os
 
-        with open(f'{path}.pickle', 'rb') as handle:
-            d = pickle.load(handle)
 
-        adata = sc.read_h5ad(f'{path}.h5ad')
-        adata.uns['ROMA'] = d
-        del d
-        return adata
+        output_dir = path
+        adata = self.adata 
+
+        active_modules = adata.uns['ROMA_active_modules'].index
+        if only_active:
+            selected_dict = {k: v for k, v in adata.uns['ROMA'].items() if k in active_modules}
+        else:
+            selected_dict = adata.uns['ROMA']
+
+        attributes = {
+           "subsetlist": "numpy.ndarray",
+            "outliers": "list",
+            "projections_1": "numpy.ndarray",
+            "projections_2": "numpy.ndarray",
+            "svd.components_": "numpy.ndarray"
+        }
+
+        # Loop over each key in the filtered dictionary
+        for key, gene_set_result in selected_dict.items():
+            # Create a subfolder for each key
+            key_dir = os.path.join(output_dir, key)
+            os.makedirs(key_dir, exist_ok=True)
+            
+            # Loop over each attribute defined in the mapping
+            for attr, attr_type in attributes.items():
+                # Retrieve attribute value, handling the dotted attribute for "svd.components_"
+                if "." in attr:
+                    parts = attr.split(".")
+                    attr_value = getattr(gene_set_result, parts[0], None)
+                    if attr_value is not None:
+                        attr_value = getattr(attr_value, parts[1], None)
+                else:
+                    attr_value = getattr(gene_set_result, attr, None)
+                
+                # If the attribute exists, save it to a file
+                if attr_value is not None:
+                    file_name = f"{attr}"
+                    file_path = os.path.join(key_dir, file_name)
+                    
+                    if attr_type == "numpy.ndarray":
+                        # Save numpy array (np.save writes binary files; extension can be arbitrary)
+                        np.save(file_path, attr_value)
+                    elif attr_type == "list":
+                        # Save list using pickle
+                        with open(file_path, "wb") as f:
+                            pickle.dump(attr_value, f)
+
         
+        adata.uns['ROMA_stats'].to_csv(f"{path}/ROMA_stats.csv") 
+        adata.uns['ROMA_active_modules'].to_csv(f"{path}/ROMA_active_modules.csv")
+        
+        # is this part actually necessary now ?     
+        del adata.uns['ROMA'] 
+        if save_adata:
+            adata.write(f"{path}/roma_adata.h5ad")
+
+        return
+    
+
+    def load_active_modules_results(self, path):
+
+        # load adata with ROMA results from the path
+        # if roma.adata is empty, loads it to roma.adata, considering adata_roma.h5ad was saved before
+
+        import os
+        import numpy as np
+        import pandas as pd
+        import pickle
+        from types import SimpleNamespace
+
+        output_dir = path
+
+        loaded_dict = {}
+
+        # Loop through each folder (each folder name is expected to be a key)
+        for key in os.listdir(output_dir):
+            key_dir = os.path.join(output_dir, key)
+            if os.path.isdir(key_dir):
+                # Create a new GeneSetResult object
+                gene_set = self.GeneSetResult(None, None, None, None, None)
+                gene_set.custom_name = key
+
+                # Iterate over files within the folder
+                for file in os.listdir(key_dir):
+                    file_path = os.path.join(key_dir, file)
+                    # Attribute name is the filename without the ".file" extension
+                    attr_name = file.replace(".npy", "")
+                    #print(attr_name)
+                    if attr_name == "subsetlist":
+                        gene_set.subsetlist = np.load(file_path, allow_pickle=True)
+                    elif attr_name == "outliers":
+                        with open(file_path, "rb") as f:
+                            gene_set.outliers = pickle.load(f)
+                    elif attr_name == "projections_1":
+                        gene_set.projections_1 = np.load(file_path, allow_pickle=True)
+                    elif attr_name == "projections_2":
+                        gene_set.projections_2 = np.load(file_path, allow_pickle=True)
+                    elif attr_name == "svd.components_":
+                        # Load the numpy array for svd.components_
+                        components = np.load(file_path, allow_pickle=True)
+                        # Create a dummy object (using SimpleNamespace) to hold the attribute
+                        gene_set.svd = SimpleNamespace(components_=components)
+                        
+                loaded_dict[key] = gene_set
+        if not self.adata:
+            self.adata = sc.read_h5ad(f"{path}/roma_adata.h5ad")
+        self.adata.uns['ROMA'] = loaded_dict
+        self.adata.uns['ROMA_stats'] = pd.read_csv(f"{path}/ROMA_stats.csv") 
+        self.adata.uns['ROMA_active_modules'] = pd.read_csv(f"{path}/ROMA_active_modules.csv")
+
+        return
+
     
     
     
