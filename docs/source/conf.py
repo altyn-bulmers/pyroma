@@ -45,10 +45,10 @@ myst_enable_extensions = ["deflist", "colon_fence"]
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
-#source_suffix = {
-#    '.rst': 'restructuredtext',
-#    '.ipynb': 'nbsphinx',
-#}
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.ipynb': 'nbsphinx',
+}
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
