@@ -943,7 +943,7 @@ class ROMA:
             
     def compute_median_exp(self, svd_, X, raw_X_subset, gene_set_name=None):
         """
-        Computes the shifted pathway 
+        Compute the shifted pathway 
         """
 
         #if X is None or X.shape[0] == 0:
@@ -1290,11 +1290,17 @@ class ROMA:
         
         #pl.adata = self.adata
         """
-        Computes ROMA
+        Computes ROMA module activity scores
+        
+        Parameters
+        ----------
         min_n_genes = 10 (default) minimum geneset size of genes present in the provided dataset.
         approx_int = 20 (default) granularity of the null geneset size, 
                     from 0 to 100, what is the minimum distance in the n of genes between sizes of the genesets.  
         
+        Returns
+        ----------
+        None
         """
 
         results = {}
