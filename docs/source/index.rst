@@ -7,13 +7,13 @@ Welcome to pyROMA's documentation!
 ==================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
 
    tutorial/index
    usage
    api
-   #changelog
+   changelog
 
 Indices and tables
 ==================
