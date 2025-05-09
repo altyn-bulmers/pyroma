@@ -13,7 +13,7 @@ Welcome to pyROMA's documentation!
    tutorial/index
    usage
    api
-   changelog
+   #changelog
 
 Indices and tables
 ==================
