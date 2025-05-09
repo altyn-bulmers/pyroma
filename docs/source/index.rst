@@ -10,7 +10,7 @@ Welcome to pyROMA's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   tutorial
+   tutorial/index
    usage
    api
    changelog
