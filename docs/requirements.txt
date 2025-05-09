@@ -1,0 +1,6 @@
+sphinx>=4.0
+sphinx-rtd-theme
+sphinx-autodoc-typehints
+sphinxcontrib-napoleon
+myst-parser              # if you prefer Markdown
+nbsphinx                 # if embedding .ipynb tutorials
