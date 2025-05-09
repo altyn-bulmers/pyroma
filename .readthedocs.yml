@@ -5,8 +5,8 @@ sphinx:
 
 formats:
   - htmlzip
-  - pdf
-  - epub
+  #- pdf
+  #- epub
 
 python:
   version: 3.10
