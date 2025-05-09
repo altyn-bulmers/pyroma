@@ -1,6 +1,6 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: roma-analysis
-Version: 0.1.5
+Version: 0.1.6
 Summary: Representation and Quantification of Module Activity for bulk and single cell transcriptomics in python
 Home-page: https://github.com/altyn-bulmers
 Download-URL: https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.1.5.tar.gz
@@ -16,3 +16,12 @@ Requires-Dist: scikit-learn
 Requires-Dist: numpy
 Requires-Dist: matplotlib
 Requires-Dist: pandas
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: download-url
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: requires-dist
+Dynamic: summary
