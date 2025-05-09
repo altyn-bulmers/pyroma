@@ -3,5 +3,5 @@ sphinx-rtd-theme
 sphinx-autodoc-typehints
 sphinxcontrib-napoleon
 myst-parser              # if Markdown
-#nbsphinx                 # if embedding .ipynb tutorials
-myst_nb
+nbsphinx                 # if embedding .ipynb tutorials
+#myst_nb
