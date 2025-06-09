@@ -11,6 +11,7 @@ Welcome to pyROMA's documentation!
    
    installation
    tutorials/index
+   usage
    api
 
 Indices and tables
