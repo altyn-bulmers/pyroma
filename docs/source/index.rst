@@ -9,9 +9,8 @@ Welcome to pyROMA's documentation!
 .. toctree::
    :maxdepth: 2
    
-   installation
-   tutorials/index
    usage
+   tutorials/index
    api
 
 Indices and tables
