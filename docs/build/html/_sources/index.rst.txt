@@ -8,8 +8,9 @@ Welcome to pyROMA's documentation!
 
 .. toctree::
    :maxdepth: 2
+   :caption: Contents:
    
-   installation
+   usage
    tutorials/index
    api
 
