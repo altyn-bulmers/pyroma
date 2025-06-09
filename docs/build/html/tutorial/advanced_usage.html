@@ -1,0 +1,925 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>standard preprocessing &mdash; pyROMA 0.1.6 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=6e0256f3"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pyROMA
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pyROMA</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">standard preprocessing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorial/advanced_usage.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">### depending on which directory you run your notebook from</span>
+<span class="c1">### you could locate pyroma package like this</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="c1">#sys.path.append(&#39;/path/to/your/directory/pyroma/&#39;)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/home/az/Projects/01_Curie/05_pyROMA/pyroma/&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyroma</span>
+<span class="n">roma</span> <span class="o">=</span> <span class="n">pyroma</span><span class="o">.</span><span class="n">ROMA</span><span class="p">()</span>
+<span class="n">roma</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-green-intense-fg ansi-bold">scROMA</span>
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">zipfile</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scipy.io</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">glob</span><span class="w"> </span><span class="kn">import</span> <span class="n">glob</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+/home/az/Projects/01_Curie/05_pyROMA/pyroma/docs/source/tutorial
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="s1">&#39;/home/az/Projects/01_Curie/05_pyROMA/pyroma&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">datasets_dir</span> <span class="o">=</span> <span class="s2">&quot;datasets&quot;</span>
+
+<span class="n">adata</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">datasets_dir</span><span class="p">,</span> <span class="s2">&quot;rna_10xpmbc3k.h5ad&quot;</span><span class="p">))</span>
+<span class="n">adata</span>
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+AnnData object with n_obs × n_vars = 2700 × 32738
+    obs: &#39;celltype&#39;
+    var: &#39;gene_ids&#39;
+</pre></div></div>
+</div>
+<section id="standard-preprocessing">
+<h1>standard preprocessing<a class="headerlink" href="#standard-preprocessing" title="Link to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_cells</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_genes</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">filter_genes</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">min_cells</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">normalize_total</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">log1p</span><span class="p">(</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+AnnData object with n_obs × n_vars = 2700 × 13714
+    obs: &#39;celltype&#39;, &#39;n_genes&#39;
+    var: &#39;gene_ids&#39;, &#39;n_cells&#39;
+    uns: &#39;log1p&#39;
+</pre></div></div>
+</div>
+</section>
+<section id="run-pyroma">
+<h1>run pyroma<a class="headerlink" href="#run-pyroma" title="Link to this heading"></a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="n">genesets_dir</span> <span class="o">=</span> <span class="s2">&quot;genesets&quot;</span>
+<span class="n">roma</span><span class="o">.</span><span class="n">gmt</span> <span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">genesets_dir</span><span class="p">,</span> <span class="s2">&quot;h.all.v2023.1.Hs.symbols.gmt&quot;</span><span class="p">)</span>
+
+<span class="n">roma</span><span class="o">.</span><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span>
+<span class="n">roma</span><span class="o">.</span><span class="n">pc_sign_mode</span> <span class="o">=</span> <span class="s1">&#39;UseMeanExpressionAllWeights&#39;</span>
+<span class="n">pathways_to_check</span> <span class="o">=</span> <span class="s1">&#39;all&#39;</span> <span class="c1">#[&#39;HALLMARK_NOTCH_SIGNALING&#39;, &#39;HALLMARK_PANCREAS_BETA_CELLS&#39;, &#39;HALLMARK_TGF_BETA_SIGNALING&#39; ]</span>
+
+<span class="n">iters</span> <span class="o">=</span> <span class="mi">100</span>
+
+<span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+<span class="n">roma</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">pathways_to_check</span><span class="p">,</span>
+             <span class="n">parallel</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+             <span class="n">loocv_on</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">iters</span><span class="o">=</span><span class="n">iters</span><span class="p">,</span>
+            <span class="p">)</span>
+<span class="n">end</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+<span class="n">minutes</span><span class="p">,</span> <span class="n">seconds</span> <span class="o">=</span> <span class="nb">divmod</span><span class="p">(</span><span class="n">end</span> <span class="o">-</span> <span class="n">start</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU Parallel </span><span class="si">{</span><span class="n">iters</span><span class="si">}</span><span class="s2"> iterations for shape </span><span class="si">{</span><span class="n">adata</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, running time (min): &quot;</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="si">{:0&gt;2}</span><span class="s2">:</span><span class="si">{:05.2f}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">minutes</span><span class="p">),</span><span class="n">seconds</span><span class="p">))</span>
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Processing gene set: <span class="ansi-cyan-intense-fg ansi-bold">HALLMARK_NOTCH_SIGNALING</span> | len of subsetlist: <span class="ansi-bold">25</span>
+Running time: 00:06.23
+Processing gene set: <span class="ansi-cyan-intense-fg ansi-bold">HALLMARK_PANCREAS_BETA_CELLS</span> | len of subsetlist: <span class="ansi-bold">14</span>
+Using existing null distribution
+Processing gene set: <span class="ansi-cyan-intense-fg ansi-bold">HALLMARK_TGF_BETA_SIGNALING</span> | len of subsetlist: <span class="ansi-bold">47</span>
+Running time: 00:07.89
+<span class="ansi-magenta-intense-fg ansi-bold">Finished</span>: CPU Parallel 10 iterations for shape (2700, 13714), running time (min): 00:23.62
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">roma</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-green-intense-fg ansi-bold">scROMA</span>: module activities are computed
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+AnnData object with n_obs × n_vars = 2700 × 13714
+    obs: &#39;celltype&#39;, &#39;n_genes&#39;
+    var: &#39;gene_ids&#39;, &#39;n_cells&#39;
+    uns: &#39;log1p&#39;, &#39;ROMA&#39;, &#39;ROMA_stats&#39;, &#39;ROMA_active_modules&#39;
+</pre></div></div>
+</div>
+</section>
+<section id="all-the-pyroma-statistics">
+<h1>all the pyroma statistics<a class="headerlink" href="#all-the-pyroma-statistics" title="Link to this heading"></a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;ROMA_stats&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>L1</th>
+      <th>ppv L1</th>
+      <th>Median Exp</th>
+      <th>ppv Med Exp</th>
+      <th>q L1</th>
+      <th>q Med Exp</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>HALLMARK_NOTCH_SIGNALING</th>
+      <td>0.308422</td>
+      <td>0.5</td>
+      <td>0.046337</td>
+      <td>0.272727</td>
+      <td>0.50</td>
+      <td>0.818182</td>
+    </tr>
+    <tr>
+      <th>HALLMARK_PANCREAS_BETA_CELLS</th>
+      <td>0.329635</td>
+      <td>0.3</td>
+      <td>-0.002735</td>
+      <td>1.000000</td>
+      <td>0.45</td>
+      <td>1.000000</td>
+    </tr>
+    <tr>
+      <th>HALLMARK_TGF_BETA_SIGNALING</th>
+      <td>0.234389</td>
+      <td>0.2</td>
+      <td>-0.024408</td>
+      <td>0.727273</td>
+      <td>0.45</td>
+      <td>1.000000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="active-pathways">
+<h1>active pathways<a class="headerlink" href="#active-pathways" title="Link to this heading"></a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;ROMA_active_modules&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s1">&#39;Median Exp&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>L1</th>
+      <th>ppv L1</th>
+      <th>Median Exp</th>
+      <th>ppv Med Exp</th>
+      <th>q L1</th>
+      <th>q Med Exp</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="visualize-results">
+<h1>visualize results<a class="headerlink" href="#visualize-results" title="Link to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">pp</span><span class="o">.</span><span class="n">neighbors</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">)</span>
+<span class="n">sc</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>celltype</th>
+      <th>n_genes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>AAACATACAACCAC-1</th>
+      <td>CD4 T</td>
+      <td>781</td>
+    </tr>
+    <tr>
+      <th>AAACATTGAGCTAC-1</th>
+      <td>B</td>
+      <td>1352</td>
+    </tr>
+    <tr>
+      <th>AAACATTGATCAGC-1</th>
+      <td>CD4 T</td>
+      <td>1131</td>
+    </tr>
+    <tr>
+      <th>AAACCGTGCTTCCG-1</th>
+      <td>CD14 Monocytes</td>
+      <td>960</td>
+    </tr>
+    <tr>
+      <th>AAACCGTGTATGCG-1</th>
+      <td>NK</td>
+      <td>522</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>TTTCGAACTCTCAT-1</th>
+      <td>CD14 Monocytes</td>
+      <td>1155</td>
+    </tr>
+    <tr>
+      <th>TTTCTACTGAGGCA-1</th>
+      <td>B</td>
+      <td>1227</td>
+    </tr>
+    <tr>
+      <th>TTTCTACTTCCTCG-1</th>
+      <td>B</td>
+      <td>622</td>
+    </tr>
+    <tr>
+      <th>TTTGCATGAGAGGC-1</th>
+      <td>B</td>
+      <td>454</td>
+    </tr>
+    <tr>
+      <th>TTTGCATGCCTCAC-1</th>
+      <td>CD4 T</td>
+      <td>724</td>
+    </tr>
+  </tbody>
+</table>
+<p>2700 rows × 2 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span>
+                                <span class="p">],</span>
+                                <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                <span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_advanced_usage_20_0.png" src="../_images/tutorial_advanced_usage_20_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span>
+                                <span class="p">],</span>
+                                <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                <span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_advanced_usage_21_0.png" src="../_images/tutorial_advanced_usage_21_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">geneset_name</span> <span class="o">=</span> <span class="s1">&#39;HALLMARK_INFLAMMATORY_RESPONSE&#39;</span>
+
+<span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">_projections_1&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;ROMA&#39;</span><span class="p">][</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">svd</span><span class="o">.</span><span class="n">components_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">_projections_1_reverse&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;ROMA&#39;</span><span class="p">][</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">svd</span><span class="o">.</span><span class="n">components_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="n">GeneScores</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;ROMA&#39;</span><span class="p">][</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">projections_1</span><span class="p">,</span>
+                <span class="n">index</span><span class="o">=</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">uns</span><span class="p">[</span><span class="s1">&#39;ROMA&#39;</span><span class="p">][</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">subsetlist</span><span class="p">,</span>
+                <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">])</span>
+
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">_projections_1&#39;</span><span class="p">],</span>
+                                <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                <span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">_projections_1&#39;</span><span class="p">],</span>
+                                <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                <span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
+<span class="ansi-red-fg">KeyError</span>                                  Traceback (most recent call last)
+Cell <span class="ansi-green-fg">In[18], line 3</span>
+<span class="ansi-green-intense-fg ansi-bold">      1</span> geneset_name <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">HALLMARK_INFLAMMATORY_RESPONSE</span><span style="color: rgb(175,0,0)">&#39;</span>
+<span class="ansi-green-fg">----&gt; 3</span> roma<span style="color: rgb(98,98,98)">.</span>adata<span style="color: rgb(98,98,98)">.</span>obs[<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>geneset_name<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">_projections_1</span><span style="color: rgb(175,0,0)">&#39;</span>] <span style="color: rgb(98,98,98)">=</span> <span class="ansi-yellow-bg">roma</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">adata</span><span class="ansi-yellow-bg" style="color: rgb(98,98,98)">.</span><span class="ansi-yellow-bg">uns</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">ROMA</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg">]</span><span class="ansi-yellow-bg">[</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">f</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(175,95,135)">{</span><span class="ansi-yellow-bg">geneset_name</span><span class="ansi-yellow-bg ansi-bold" style="color: rgb(175,95,135)">}</span><span class="ansi-yellow-bg" style="color: rgb(175,0,0)">&#39;</span><span class="ansi-yellow-bg">]</span><span style="color: rgb(98,98,98)">.</span>svd<span style="color: rgb(98,98,98)">.</span>components_[<span style="color: rgb(98,98,98)">0</span>]
+<span class="ansi-green-intense-fg ansi-bold">      4</span> roma<span style="color: rgb(98,98,98)">.</span>adata<span style="color: rgb(98,98,98)">.</span>obs[<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>geneset_name<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">_projections_1_reverse</span><span style="color: rgb(175,0,0)">&#39;</span>] <span style="color: rgb(98,98,98)">=</span> <span style="color: rgb(98,98,98)">-</span><span style="color: rgb(98,98,98)">1</span> <span style="color: rgb(98,98,98)">*</span> roma<span style="color: rgb(98,98,98)">.</span>adata<span style="color: rgb(98,98,98)">.</span>uns[<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">ROMA</span><span style="color: rgb(175,0,0)">&#39;</span>][<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>geneset_name<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>]<span style="color: rgb(98,98,98)">.</span>svd<span style="color: rgb(98,98,98)">.</span>components_[<span style="color: rgb(98,98,98)">0</span>]
+<span class="ansi-green-intense-fg ansi-bold">      6</span> GeneScores <span style="color: rgb(98,98,98)">=</span> pd<span style="color: rgb(98,98,98)">.</span>DataFrame(roma<span style="color: rgb(98,98,98)">.</span>adata<span style="color: rgb(98,98,98)">.</span>uns[<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">ROMA</span><span style="color: rgb(175,0,0)">&#39;</span>][<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>geneset_name<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>]<span style="color: rgb(98,98,98)">.</span>projections_1,
+<span class="ansi-green-intense-fg ansi-bold">      7</span>                 index<span style="color: rgb(98,98,98)">=</span>roma<span style="color: rgb(98,98,98)">.</span>adata<span style="color: rgb(98,98,98)">.</span>uns[<span style="color: rgb(175,0,0)">&#39;</span><span style="color: rgb(175,0,0)">ROMA</span><span style="color: rgb(175,0,0)">&#39;</span>][<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>geneset_name<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>]<span style="color: rgb(98,98,98)">.</span>subsetlist,
+<span class="ansi-green-intense-fg ansi-bold">      8</span>                 columns<span style="color: rgb(98,98,98)">=</span>[<span style="color: rgb(175,0,0)">f</span><span style="color: rgb(175,0,0)">&#39;</span><span class="ansi-bold" style="color: rgb(175,95,135)">{</span>geneset_name<span class="ansi-bold" style="color: rgb(175,95,135)">}</span><span style="color: rgb(175,0,0)">&#39;</span>])
+
+<span class="ansi-red-fg">KeyError</span>: &#39;HALLMARK_INFLAMMATORY_RESPONSE&#39;
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">GeneScores</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>HALLMARK_INFLAMMATORY_RESPONSE</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>CXCL10</th>
+      <td>-0.170376</td>
+    </tr>
+    <tr>
+      <th>CCL2</th>
+      <td>-0.171694</td>
+    </tr>
+    <tr>
+      <th>CCL5</th>
+      <td>45.372082</td>
+    </tr>
+    <tr>
+      <th>FPR1</th>
+      <td>-3.665694</td>
+    </tr>
+    <tr>
+      <th>CCL20</th>
+      <td>0.093291</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>STAB1</th>
+      <td>-0.306701</td>
+    </tr>
+    <tr>
+      <th>IRF1</th>
+      <td>1.357086</td>
+    </tr>
+    <tr>
+      <th>ICAM4</th>
+      <td>-0.329905</td>
+    </tr>
+    <tr>
+      <th>P2RX4</th>
+      <td>-0.153743</td>
+    </tr>
+    <tr>
+      <th>ABI1</th>
+      <td>1.406667</td>
+    </tr>
+  </tbody>
+</table>
+<p>149 rows × 1 columns</p>
+</div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># optional: to load pathway-genes dictionary</span>
+<span class="n">genesets</span> <span class="o">=</span> <span class="n">roma</span><span class="o">.</span><span class="n">read_gmt_to_dict</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">gmt</span><span class="p">)</span>
+<br/></pre></div>
+</div>
+</div>
+</section>
+<section id="save-and-load-results">
+<h1>save and load results<a class="headerlink" href="#save-and-load-results" title="Link to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">save_dir</span> <span class="o">=</span> <span class="s1">&#39;results&#39;</span>
+
+<span class="n">roma</span><span class="o">.</span><span class="n">save_active_modules_results</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">save_dir</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">del</span> <span class="n">roma</span><span class="o">.</span><span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1">#roma.adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">load_dir</span> <span class="o">=</span> <span class="s1">&#39;results&#39;</span>
+
+<span class="n">roma</span><span class="o">.</span><span class="n">load_active_modules_results</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">save_dir</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+AnnData object with n_obs × n_vars = 2700 × 13714
+    obs: &#39;celltype&#39;, &#39;n_genes&#39;, &#39;HALLMARK_INFLAMMATORY_RESPONSE_projections_1&#39;, &#39;HALLMARK_INFLAMMATORY_RESPONSE_projections_1_reverse&#39;
+    var: &#39;gene_ids&#39;, &#39;n_cells&#39;
+    uns: &#39;ROMA_active_modules&#39;, &#39;ROMA_stats&#39;, &#39;celltype_colors&#39;, &#39;log1p&#39;, &#39;neighbors&#39;, &#39;pca&#39;, &#39;umap&#39;, &#39;ROMA&#39;
+    obsm: &#39;X_pca&#39;, &#39;X_umap&#39;
+    varm: &#39;PCs&#39;
+    obsp: &#39;connectivities&#39;, &#39;distances&#39;
+</pre></div></div>
+</div>
+</section>
+<section id="top-contributing-genes">
+<h1>top contributing genes<a class="headerlink" href="#top-contributing-genes" title="Link to this heading"></a></h1>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">GeneScores</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">geneset_name</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>HALLMARK_INFLAMMATORY_RESPONSE</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>LY6E</th>
+      <td>-9.469896</td>
+    </tr>
+    <tr>
+      <th>TIMP1</th>
+      <td>-8.930674</td>
+    </tr>
+    <tr>
+      <th>CD14</th>
+      <td>-7.395456</td>
+    </tr>
+    <tr>
+      <th>NFKBIA</th>
+      <td>-5.897358</td>
+    </tr>
+    <tr>
+      <th>RHOG</th>
+      <td>-4.730138</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>CD69</th>
+      <td>3.288985</td>
+    </tr>
+    <tr>
+      <th>IL7R</th>
+      <td>6.165412</td>
+    </tr>
+    <tr>
+      <th>IFITM1</th>
+      <td>6.817437</td>
+    </tr>
+    <tr>
+      <th>LCK</th>
+      <td>8.328794</td>
+    </tr>
+    <tr>
+      <th>CCL5</th>
+      <td>45.372082</td>
+    </tr>
+  </tbody>
+</table>
+<p>149 rows × 1 columns</p>
+</div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># number of top and bottom genes</span>
+<span class="n">n_top</span> <span class="o">=</span> <span class="mi">10</span>
+<span class="n">short_name</span> <span class="o">=</span> <span class="n">geneset_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+
+<span class="n">top_n</span> <span class="o">=</span> <span class="n">GeneScores</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">n_top</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">bottom_n</span> <span class="o">=</span> <span class="n">GeneScores</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="n">n_top</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+<span class="n">top_mean_exp</span> <span class="o">=</span> <span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">[:,</span> <span class="n">top_n</span><span class="p">]</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">bottom_mean_exp</span> <span class="o">=</span> <span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">[:,</span> <span class="n">bottom_n</span><span class="p">]</span><span class="o">.</span><span class="n">X</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;top_</span><span class="si">{</span><span class="n">n_top</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">short_name</span><span class="si">}</span><span class="s1">_Mean_Exp&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">top_mean_exp</span>
+<span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;bottom_</span><span class="si">{</span><span class="n">n_top</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">short_name</span><span class="si">}</span><span class="s1">_Mean_Exp&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">bottom_mean_exp</span>
+
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">pca</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">_projections_1&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;top_</span><span class="si">{</span><span class="n">n_top</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">short_name</span><span class="si">}</span><span class="s1">_Mean_Exp&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;bottom_</span><span class="si">{</span><span class="n">n_top</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">short_name</span><span class="si">}</span><span class="s1">_Mean_Exp&#39;</span><span class="p">],</span>
+                                <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                <span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+
+<span class="n">sc</span><span class="o">.</span><span class="n">pl</span><span class="o">.</span><span class="n">umap</span><span class="p">(</span><span class="n">roma</span><span class="o">.</span><span class="n">adata</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;celltype&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">geneset_name</span><span class="si">}</span><span class="s1">_projections_1&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;top_</span><span class="si">{</span><span class="n">n_top</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">short_name</span><span class="si">}</span><span class="s1">_Mean_Exp&#39;</span><span class="p">,</span>
+                                <span class="sa">f</span><span class="s1">&#39;bottom_</span><span class="si">{</span><span class="n">n_top</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">short_name</span><span class="si">}</span><span class="s1">_Mean_Exp&#39;</span><span class="p">],</span>
+                                <span class="n">frameon</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+                                <span class="n">wspace</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_advanced_usage_33_0.png" src="../_images/tutorial_advanced_usage_33_0.png" />
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorial_advanced_usage_33_1.png" src="../_images/tutorial_advanced_usage_33_1.png" />
+</div>
+</div>
+</section>
+<section id="end">
+<h1>end<a class="headerlink" href="#end" title="Link to this heading"></a></h1>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Altynbek Zhubanchaliyev.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

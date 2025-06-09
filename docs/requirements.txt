@@ -1,7 +1,8 @@
 sphinx>=4.0
 sphinx-rtd-theme
-sphinx-autodoc-typehints
+#sphinx-autodoc-typehints
 sphinxcontrib-napoleon
 myst-parser              # if Markdown
 nbsphinx                 # if embedding .ipynb tutorials
-#myst_nb
+sphinx_rtd_theme
+ipykernel
