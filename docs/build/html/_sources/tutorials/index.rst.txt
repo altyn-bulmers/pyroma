@@ -3,7 +3,7 @@ Tutorials
 
 .. toctree::
    :maxdepth: 2
-   :caption: Tutorial Pages:
+   :caption: Contents:
    :titlesonly:
 
    getting_started
