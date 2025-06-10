@@ -37,6 +37,7 @@ extensions = [
     "sphinx.ext.napoleon",                   
     "nbsphinx",                    # embedding  .ipynb
     'sphinx.ext.mathjax',
+    'ipykernel'
 ]
 
 myst_enable_extensions = ["deflist", "colon_fence"]
