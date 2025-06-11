@@ -6,6 +6,10 @@
 Welcome to pyROMA's documentation!
 ==================================
 
+.. image:: pyroma_logo.png
+   :alt: pyROMA logo
+   :width: 300px
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

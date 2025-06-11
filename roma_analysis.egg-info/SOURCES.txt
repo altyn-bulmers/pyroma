@@ -4,6 +4,9 @@ setup.py
 pyroma/__init__.py
 pyroma/plotting.py
 pyroma/roma.py
+pyroma/sparse_methods.py
+pyroma/sparse_methods_old.py
+pyroma/test_pyroma.py
 pyroma/utils.py
 roma_analysis.egg-info/PKG-INFO
 roma_analysis.egg-info/SOURCES.txt
