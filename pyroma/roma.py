@@ -1318,7 +1318,7 @@ class ROMA:
 
     def compute(self, 
                 selected_gene_sets: Union[List[str], str] = 'all', 
-                parallel: bool = False, 
+                parallel: bool = True, 
                 incremental: bool = False, 
                 iters: int = 100, 
                 partial_fit: bool = False, 
