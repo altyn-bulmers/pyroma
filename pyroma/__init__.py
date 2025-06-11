@@ -2,6 +2,6 @@
 from . import plotting
 from . import utils
 from .roma import ROMA, GeneSetResult, color
-from . import sparse_methods
+from . import sparse_methods_old
 
 __all__ = ['ROMA', 'GeneSetResult', 'color']
