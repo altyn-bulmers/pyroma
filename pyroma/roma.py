@@ -375,9 +375,10 @@ class ROMA:
         outliers : List[int]
             Indices of detected outlier genes
         """
-        X = self._prepare_data(subset.X.T)
-        n_samples, n_features = X.shape
-
+        #X = self._prepare_data(subset.X.T)
+        X = self.subset.X.T
+        n_features, n_samples = X.shape
+        X = np.asarray(X)
         if n_samples < 2:
             if verbose:
                 print(f"Cannot perform LOOCV with {n_samples} samples.")
@@ -389,8 +390,8 @@ class ROMA:
 
         # Use efficient leave-one-out
         loo = LeaveOneOut()
-        for i, (train_index, _) in enumerate(loo.split(X.T)):
-            svd.fit(X[:, train_index].T)
+        for i, (train_index, _) in enumerate(loo.split(X)):
+            svd.fit(X[train_index])
             l1scores[i] = svd.explained_variance_ratio_[0]
         
         # Store scores for each gene
@@ -537,57 +538,6 @@ class ROMA:
                 # Note: sklearn TruncatedSVD handles sparse matrices
                 return X
         return np.asarray(X)
-
-    def old_robustTruncatedSVD(self, 
-                          adata: sc.AnnData, 
-                          subsetlist: np.ndarray, 
-                          outliers: List[int], 
-                          for_randomset: bool = False, 
-                          algorithm: str = 'randomized') -> Tuple[TruncatedSVD, np.ndarray]:
-        """
-        Perform robust truncated SVD excluding outlier genes.
-        
-        Parameters
-        ----------
-        adata : sc.AnnData
-            Annotated data matrix
-        subsetlist : np.ndarray
-            Gene names to include
-        outliers : List[int]
-            Indices of outlier genes to exclude
-        for_randomset : bool, default=False
-            Whether this is for random set computation
-        algorithm : str, default='randomized'
-            SVD algorithm ('randomized' or 'arpack')
-        
-        Returns
-        -------
-        svd : TruncatedSVD
-            Fitted SVD object
-        X : np.ndarray
-            Processed data matrix
-        """
-        # Use boolean indexing for efficiency
-        mask = np.ones(len(subsetlist), dtype=bool)
-        mask[outliers] = False
-        subset_genes = subsetlist[mask]
-        
-        # Subset data
-        subset_adata = adata[:, subset_genes]
-        X = self._prepare_data(subset_adata.X.T)
-        
-        # Compute SVD
-        n_components = min(2, min(X.shape) - 1)
-        svd = TruncatedSVD(n_components=n_components, 
-                          algorithm=algorithm, 
-                          random_state=42)
-        svd.fit(X)
-        
-        if not for_randomset:
-            self.svd = svd
-            self.X = X
-        
-        return svd, X
     
     def robustTruncatedSVD(self, 
                           adata: sc.AnnData, 
@@ -612,7 +562,7 @@ class ROMA:
             return None, None
             
         # Extract data for robust gene subset
-        X = adata[:, robust_gene_subset].X.copy()
+        X = adata[:, robust_gene_subset].X#.copy()
         
         if hasattr(X, 'toarray'):
             X = X.toarray()
@@ -1046,7 +996,7 @@ class ROMA:
     def randomset_parallel(self, 
                             subsetlist: np.ndarray, 
                             outliers: List[int], 
-                            verbose: int = 1, 
+                            verbose: int = 0, 
                             prefer_type: str = 'processes', 
                             incremental: bool = False, 
                             iters: int = 100, 
@@ -1061,7 +1011,7 @@ class ROMA:
             Array of gene names in current set
         outliers : List[int]
             Indices of outlier genes
-        verbose : int, default=1
+        verbose : int, default=0
             Verbosity level
         prefer_type : str, default='processes'
             Joblib backend preference
@@ -1327,7 +1277,8 @@ class ROMA:
                 double_mean_centering: bool = False, 
                 outlier_fisher_thr: float = 0.05, 
                 min_gene_sets: int = 3, 
-                max_outlier_prop: float = 0.5) -> None:
+                max_outlier_prop: float = 0.5,
+                verbose: int = 0) -> None:
         """
         Compute ROMA module activity scores for selected gene sets.
         
@@ -1355,6 +1306,8 @@ class ROMA:
             Minimum number of gene sets a gene must appear in to be considered for outlier removal
         max_outlier_prop : float, default=0.5
             Maximum proportion of genes that can be removed as outliers per gene set
+        verbose : int, default=0
+            Verbosity level
         
         Raises
         ------
@@ -1377,13 +1330,14 @@ class ROMA:
             self.adata.raw = self.adata
         
         # Prepare data with minimal copying
-        X = self.adata.X.T if not self.adata.is_view else self.adata.X.T.copy()
+        X = self.adata.X.T if not self.adata.is_view else self.adata.X.T#.copy()
         
         # Convert sparse to dense if needed
         #X = self._prepare_data(X)
-        if sparse.issparse(X):
+        #if sparse.issparse(X):
+        #    X = X.toarray()
+        if not isinstance(X, np.ndarray):
             X = X.toarray()
-
         # centering the sparse matrix would give a dense one
 
         # Center data
@@ -1430,7 +1384,7 @@ class ROMA:
             
             # Outlier detection
             if loocv_on:
-                self.loocv(self.subset)
+                self.loocv(self.subset, verbose=verbose)
             
             if len(self.outliers) > 0:
                 print(f"Outliers: {self.outliers}, Gene: {self.subsetlist[self.outliers[0]]}")
@@ -1474,13 +1428,14 @@ class ROMA:
             
             # Get raw data for PC sign correction
             subsetlist_no_out = [x for i, x in enumerate(self.subsetlist) if i not in self.outliers]
-            self.raw_X_subset = self.adata.raw[:, subsetlist_no_out].X.T.copy()
+            self.raw_X_subset = self.adata.raw[:, subsetlist_no_out].X.T#.copy()
             
             # Compute null distributions if parallel
             if parallel:
                 self.randomset_parallel(
                     self.subsetlist, 
                     self.outliers, 
+                    verbose=verbose,
                     prefer_type='processes', 
                     incremental=incremental, 
                     iters=iters, 
