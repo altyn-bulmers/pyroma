@@ -4,6 +4,9 @@ copyright = "2025, Altynbek Zhubanchaliyev"
 author = "Altynbek Zhubanchaliyev et al."
 release = "0.2.0"
 
+import os, sys
+sys.path.insert(0, os.path.abspath("../.."))
+
 # -- General configuration ---------------------------------------------------
 extensions = [
     "sphinx.ext.autodoc",
