@@ -8,3 +8,4 @@ Tutorials
 
    getting_started
    advanced_usage
+   advanced_usage_ct_setting

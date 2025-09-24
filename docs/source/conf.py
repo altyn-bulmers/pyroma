@@ -35,7 +35,7 @@ html_theme_options = {
     "dark_logo": "pyroma_logo.png",    # you can later add a dark-optimized logo
     "source_repository": "https://github.com/altyn-bulmers/pyroma/",
     "source_branch": "main",
-    "source_directory": "docs/",
+    "source_directory": "docs/source/",
 }
 
 # Pleasant code highlighting in light/dark:
@@ -47,8 +47,9 @@ html_static_path = ["_static"]
 
 # Intersphinx (optional – point at common docs)
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", {}),
-    "numpy": ("https://numpy.org/doc/stable/", {}),
-    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", {}),
-    "scanpy": ("https://scanpy.readthedocs.io/en/stable/", {}),
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", None),
+    "scanpy": ("https://scanpy.readthedocs.io/en/stable/", None),
 }
+

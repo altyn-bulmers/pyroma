@@ -2,4 +2,4 @@ sphinx>=7.0
 furo>=2024.8.6
 nbsphinx>=0.9
 ipykernel
-myst-parser>=2.0  # optional (only if you plan to use Markdown)
+myst-parser>=2.0   
