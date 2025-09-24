@@ -52,7 +52,9 @@ roma = pyroma.ROMA()
 
 # Assign your AnnData object and GMT file
 roma.adata = adata  # AnnData from scanpy
-roma.gmt = 'h.all.v2023.2.Hs.symbols.gmt'
+
+hallmarks_gmt_path = pyroma.genesets.use_hallmarks()
+roma.gmt   = hallmarks_gmt_path
 
 # Compute module activity scores
 roma.compute()

@@ -23,6 +23,9 @@ Example
    import pyroma
    roma = pyroma.ROMA()
    roma.adata = adata
-   roma.gmt   = "h.all.v2023.2.Hs.symbols.gmt"
+
+   hallmarks_gmt_path = pyroma.genesets.use_hallmarks()
+   roma.gmt   = hallmarks_gmt_path
+   
    roma.compute()
    roma.adata.uns['ROMA_active_modules']
