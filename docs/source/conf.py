@@ -20,6 +20,7 @@ exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 
 # Don’t execute notebooks on build (you already had this):
 nbsphinx_execute = "never"
+nbsphinx_allow_errors = True
 
 # -- HTML --------------------------------------------------------------------
 html_theme = "furo"
@@ -31,8 +32,7 @@ html_logo = "pyroma_logo.png"
 # Optional but nice with Furo:
 html_theme_options = {
     "sidebar_hide_name": False,
-    "light_logo": "pyroma_logo.png",   # use same image for now
-    "dark_logo": "pyroma_logo.png",    # you can later add a dark-optimized logo
+    
     "source_repository": "https://github.com/altyn-bulmers/pyroma/",
     "source_branch": "main",
     "source_directory": "docs/source/",
