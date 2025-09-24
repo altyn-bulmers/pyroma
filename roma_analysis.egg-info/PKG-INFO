@@ -1,9 +1,9 @@
 Metadata-Version: 2.4
 Name: roma-analysis
-Version: 0.1.8
+Version: 0.1.9
 Summary: Representation and Quantification of Module Activity for bulk and single cell transcriptomics in python
 Home-page: https://github.com/altyn-bulmers
-Download-URL: https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.1.8.tar.gz
+Download-URL: https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.1.9.tar.gz
 Author: Altynbek Zhubanchaliyev
 Author-email: altynbek.zhubanchaliyev@curie.fr
 License: GPL-3.0
