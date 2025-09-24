@@ -1,66 +1,54 @@
-# Configuration file for the Sphinx documentation builder.
-#
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
-
-# -- Path setup --------------------------------------------------------------
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
-
-
 # -- Project information -----------------------------------------------------
-
-project = 'pyROMA'
-copyright = '2025, Altynbek Zhubanchaliyev'
-author = 'Altynbek Zhubanchaliyev et al.'
-
-# The full version, including alpha/beta/rc tags
-release = '0.1.6'
-
+project = "pyROMA"
+copyright = "2025, Altynbek Zhubanchaliyev"
+author = "Altynbek Zhubanchaliyev et al."
+release = "0.2.0"
 
 # -- General configuration ---------------------------------------------------
-
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
-    "sphinx.ext.napoleon",                   
-    "nbsphinx",                    # embedding  .ipynb
-    'sphinx.ext.mathjax',
-    'ipykernel'
+    "sphinx.ext.napoleon",
+    "nbsphinx",
+    "sphinx.ext.mathjax",
+    # "myst_parser",  # uncomment if you add Markdown docs
 ]
 
-myst_enable_extensions = ["deflist", "colon_fence"]
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 
+# Don’t execute notebooks on build (you already had this):
+nbsphinx_execute = "never"
+
+# -- HTML --------------------------------------------------------------------
+html_theme = "furo"
+
+# If you keep a single logo file in docs/
+# (works fine; optional: provide separate light/dark images)
 html_logo = "pyroma_logo.png"
 
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+# Optional but nice with Furo:
+html_theme_options = {
+    "sidebar_hide_name": False,
+    "light_logo": "pyroma_logo.png",   # use same image for now
+    "dark_logo": "pyroma_logo.png",    # you can later add a dark-optimized logo
+    "source_repository": "https://github.com/altyn-bulmers/pyroma/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+}
 
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', '**.ipynb_checkpoints']
+# Pleasant code highlighting in light/dark:
+pygments_style = "tango"
+pygments_dark_style = "native"
 
-# -- Options for HTML output -------------------------------------------------
+# Static assets (leave as-is if you don’t have custom CSS/JS yet)
+html_static_path = ["_static"]
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
-html_theme = "sphinx_rtd_theme" #'alabaster'
-
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
-nbsphinx_execute = 'never'
+# Intersphinx (optional – point at common docs)
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", {}),
+    "numpy": ("https://numpy.org/doc/stable/", {}),
+    "pandas": ("https://pandas.pydata.org/pandas-docs/stable/", {}),
+    "scanpy": ("https://scanpy.readthedocs.io/en/stable/", {}),
+}

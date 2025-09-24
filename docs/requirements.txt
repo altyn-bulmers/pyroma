@@ -1,8 +1,5 @@
-sphinx>=4.0
-sphinx-rtd-theme
-#sphinx-autodoc-typehints
-sphinxcontrib-napoleon
-myst-parser              # if Markdown
-nbsphinx                 # if embedding .ipynb tutorials
-sphinx_rtd_theme
+sphinx>=7.0
+furo>=2024.8.6
+nbsphinx>=0.9
 ipykernel
+myst-parser>=2.0  # optional (only if you plan to use Markdown)
