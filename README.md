@@ -69,9 +69,9 @@ roma.adata.uns['ROMA_active_modules']
 
 Comprehensive tutorials are available on Read the Docs:
 
-- **Getting started** — https://pyroma.readthedocs.io/en/latest/tutorials/getting_started.html
-- **Advanced usage** — https://pyroma.readthedocs.io/en/latest/tutorials/advanced_usage.html
-- **Advanced usage (cell-type setting)** — https://pyroma.readthedocs.io/en/latest/tutorials/advanced_usage_ct_setting.html
+- [**Getting started**](https://pyroma.readthedocs.io/en/latest/tutorials/getting_started.html)
+- [**Advanced usage**](https://pyroma.readthedocs.io/en/latest/tutorials/advanced_usage.html)
+- [**Advanced usage (cell-type setting)**](https://pyroma.readthedocs.io/en/latest/tutorials/advanced_usage_ct_setting.html)
 ---
 
 ## Clone with Submodules
