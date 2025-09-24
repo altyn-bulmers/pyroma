@@ -11,7 +11,8 @@ setup(
   url = 'https://github.com/altyn-bulmers',  
   download_url = 'https://github.com/altyn-bulmers/pyroma/archive/refs/tags/0.2.0.tar.gz',    
   keywords = ['python', 'bioinformatics', 'machine-learning', 
-              'pathway-activity', 'transcriptomics', 'rnaseq', 'single-cell-rna-seq', 
+              'pathway-activity', 'transcriptomics', 'rna-seq-analysis', 'single-cell-rna-seq', 
+              'pathway-analysis', 'pathway-enrichment-analysis' 
               ],   
   install_requires=[            
           'scanpy',

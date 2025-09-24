@@ -65,20 +65,13 @@ roma.adata.uns['ROMA_active_modules']
 
 ---
 
-## Tutorial
+## Tutorials
 
-A step-by-step tutorial notebook is available in the `tutorial` branch:
+Comprehensive tutorials are available on Read the Docs:
 
-* **Notebook**: [01-tutorial.ipynb](https://github.com/altyn-bulmers/pyroma/blob/tutorial/01-tutorial.ipynb)
-
-To run it locally:
-
-```bash
-git clone --branch tutorial --single-branch git@github.com:altyn-bulmers/pyroma.git
-cd pyroma
-jupyter lab tutorial/01-tutorial.ipynb
-```
-
+- **Getting started** — https://pyroma.readthedocs.io/en/latest/tutorials/getting_started.html
+- **Advanced usage** — https://pyroma.readthedocs.io/en/latest/tutorials/advanced_usage.html
+- **Advanced usage (cell-type setting)** — https://pyroma.readthedocs.io/en/latest/tutorials/advanced_usage_ct_setting.html
 ---
 
 ## Clone with Submodules
@@ -93,7 +86,7 @@ git clone --recurse-submodules git@github.com:altyn-bulmers/pyroma.git
 
 ## Reproducibility
 
-Companion notebooks and detailed workflows are maintained in a dedicated repository:
+Companion notebooks and detailed workflows are maintained in a dedicated repository (will be available soon):
 
 * [pyroma\_reproducibility](https://github.com/altyn-bulmers/pyroma_reproducibility)
 
