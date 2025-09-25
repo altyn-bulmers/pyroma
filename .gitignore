@@ -1,7 +1,25 @@
-results/roma_adata.h5ad
-results/roma_adata.h5ad
-
 # Compiled files
 .venv/
 venv/
 env/
+
+# Byte-compiled / caches / build
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# VSCode / OS
+.vscode/
+.DS_Store
+
+
+pyroma/sparse_methods.py
+pyroma/sparse_methods_old.py
+pyroma/_pyroma_kaggle_multiGPU.py
+results/roma_adata.h5ad
+results/roma_adata.h5ad

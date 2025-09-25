@@ -3,7 +3,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as la
 
 def spdot(A, B):
-    """Dot that “just works” for sparse/dense combos."""
+    """Dot that works for sparse/dense combos."""
     if sp.issparse(A) and sp.issparse(B):
         return A @ B
     elif sp.issparse(A):

@@ -178,7 +178,7 @@ class ROMA:
     def assess_significance(self, results):
         """
         Dummy significance assessment.
-        Replace with your own method as needed.
+        Needs to be replaced.
         """
         from statsmodels.stats.multitest import multipletests
         ps = np.zeros(len(results))
