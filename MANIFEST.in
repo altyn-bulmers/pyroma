@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+recursive-include pyroma *.py
+recursive-include pyroma/genesets *.gmt
+recursive-include pyroma/datasets *.h5ad *.tsv *.csv
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .DS_Store

@@ -1,37 +1,46 @@
+"""Gene set collections for pathway analysis."""
+
 from __future__ import annotations
-from importlib.resources import files
 from pathlib import Path
+
+def _get_resource_path(filename: str) -> str:
+    """Get path to a resource file with backward compatibility."""
+    try:
+        
+        from importlib.resources import files
+        path = files(__package__).joinpath(filename)
+        
+        if hasattr(path, 'is_file'):
+            if not path.is_file():
+                raise FileNotFoundError(f"{filename} not found in package: {path!s}")
+        return str(path)
+    except (ImportError, AttributeError):
+        # Python 3.7-3.8 fallback
+        import pkg_resources
+        path = pkg_resources.resource_filename(__package__, filename)
+        if not Path(path).is_file():
+            raise FileNotFoundError(f"{filename} not found in package: {path}")
+        return path
 
 def use_hallmarks() -> str:
     """
-    Return the absolute path to the bundled Hallmark gene sets (hallmarks.gmt).
+    Return the absolute path to the bundled Hallmark gene sets.
     Safe for both editable installs and wheels.
     """
-    path = files(__package__).joinpath("h.all.v2023.1.Hs.symbols.gmt")
-    # Optional: sanity check
-    if not path.is_file():
-        raise FileNotFoundError(f"hallmarks.gmt not found in package: {path!s}")
-    return str(path)
+    return _get_resource_path("h.all.v2023.1.Hs.symbols.gmt")
 
 def use_reactome() -> str:
     """
     Return the absolute path to the bundled Reactome gene sets.
     Safe for both editable installs and wheels.
     """
-    path = files(__package__).joinpath("ReactomePathways.gmt")
-    # Optional: sanity check
-    if not path.is_file():
-        raise FileNotFoundError(f"ReactomePathways.gmt not found in package: {path!s}")
-    return str(path)
+    return _get_resource_path("ReactomePathways.gmt")
 
 def use_progeny() -> str:
     """
-    Return the absolute path to the bundled Progengy gene sets.
-    Top 500 genes were selected based on the p-value of Progeny Pathways.
+    Return the absolute path to the bundled Progeny gene sets.
     Safe for both editable installs and wheels.
     """
-    path = files(__package__).joinpath("progeny_p.gmt")
-    # Optional: sanity check
-    if not path.is_file():
-        raise FileNotFoundError(f"progeny_p.gmt not found in package: {path!s}")
-    return str(path)
+    return _get_resource_path("progeny_p.gmt")
+
+__all__ = ['use_hallmarks', 'use_reactome', 'use_progeny']

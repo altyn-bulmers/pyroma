@@ -2,7 +2,7 @@
 project = "pyROMA"
 copyright = "2025, Altynbek Zhubanchaliyev"
 author = "Altynbek Zhubanchaliyev et al."
-release = "0.2.0"
+release = "0.2.3"
 
 import os, sys
 sys.path.insert(0, os.path.abspath("../.."))

@@ -1,19 +1,42 @@
 # pyroma/__init__.py
-from importlib import import_module
+"""
+PyROMA: Python implementation of Representation Of Module Activity for single-cell RNA-seq data.
+"""
+
+from .roma import ROMA, GeneSetResult, color
+from .utils import integrate_projection_results
+
+# submodules 
+from . import datasets
+from . import genesets
+from . import plotting
+from . import utils
+from . import sparse_methods
+
+# submodule functions 
+from .datasets import pbmc3k, pbmc_ifnb
+from .genesets import use_hallmarks, use_reactome, use_progeny
+
+__version__ = '0.2.3'
 
 __all__ = [
-    "ROMA", "GeneSetResult", "color",
-    "integrate_projection_results",
-    "datasets", "genesets",
+    # Core classes
+    'ROMA', 
+    'GeneSetResult', 
+    'color',
+    
+    # Submodules
+    'datasets',
+    'genesets',
+    'plotting',
+    'utils',
+    'sparse_methods',
+    
+    # Functions
+    'integrate_projection_results',
+    'pbmc3k',
+    'pbmc_ifnb',
+    'use_hallmarks',
+    'use_reactome',
+    'use_progeny',
 ]
-
-def __getattr__(name):
-    if name in {"ROMA", "GeneSetResult", "color"}:
-        return getattr(import_module(".roma", __name__), name)
-    if name == "integrate_projection_results":
-        return import_module(".utils", __name__).integrate_projection_results
-    if name == "datasets":
-        return import_module(".datasets", __name__)
-    if name == "genesets":
-        return import_module(".genesets", __name__)
-    raise AttributeError(name)
